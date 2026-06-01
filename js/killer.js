@@ -1,7 +1,8 @@
 // killer.js - AI Killer with 5-state finite state machine + smart patrol
 import {
-  KILLER_SPEED, KILLER_CHASE_SPEED, KILLER_STATE, TILE_SIZE,
+  KILLER_SPEED, KILLER_CHASE_SPEED, KILLER_STATE, TILE, TILE_SIZE,
   KILLER_VISION_RANGE, KILLER_HEARING_RANGE, KILLER_ALERT_DURATION,
+  KILLER_ATTACK_WINDUP, KILLER_MISS_WIPE, KILLER_HIT_WIPE,
   MAP_COLS, MAP_ROWS,
 } from './constants.js';
 
@@ -16,7 +17,11 @@ export class Killer {
     this.alertTimer = 0;
     this.carryTarget = null;
     this.stunTimer = 0;
-    this.attackCooldown = 0;
+    this.attackPhase = 'idle';    // 'idle' | 'swing' | 'wipe'
+    this.attackTimer = 0;
+    this.attackHit = false;       // whether the swing connected
+    this.windowSlowTimer = 0;     // slowdown frames after vaulting a window
+    this._lastTile = -1;
     this.lastPlayerSeen = null;
     this.visitedGens = [];
     this.patrolPause = 0;
@@ -28,12 +33,43 @@ export class Killer {
   update(dt, player, gameMap) {
     if (this.stunTimer > 0) {
       this.stunTimer--;
+      this.attackPhase = 'idle';
+      this.attackTimer = 0;
       return;
     }
-    if (this.attackCooldown > 0) this.attackCooldown--;
-
+    this._updateAttack(player, gameMap);
     this._updateState(player, gameMap);
     this._executeState(dt, player, gameMap);
+
+    if (this.windowSlowTimer > 0) this.windowSlowTimer--;
+    const curTile = gameMap.getTile(this.x, this.y);
+    if (curTile === TILE.WINDOW && this._lastTile !== TILE.WINDOW) {
+      this.windowSlowTimer = 25;
+    }
+    this._lastTile = curTile;
+  }
+
+  _updateAttack(player, gameMap) {
+    if (this.attackPhase === 'idle') return;
+    this.attackTimer--;
+    if (this.attackTimer <= 0) {
+      if (this.attackPhase === 'swing') {
+        const dist = this._dist(player.x, player.y);
+        if (dist < 32 && this._canSee(player, gameMap)) {
+          player.takeHit();
+          this.attackPhase = 'wipe';
+          this.attackTimer = KILLER_HIT_WIPE;
+          this.attackHit = true;
+        } else {
+          this.attackPhase = 'wipe';
+          this.attackTimer = KILLER_MISS_WIPE;
+          this.attackHit = false;
+        }
+      } else if (this.attackPhase === 'wipe') {
+        this.attackPhase = 'idle';
+        this.attackHit = false;
+      }
+    }
   }
 
   _updateState(player, gameMap) {
@@ -63,10 +99,10 @@ export class Killer {
         } else {
           this.lastPlayerSeen = { x: player.x, y: player.y };
         }
-        if (distToPlayer < 28 && this.attackCooldown <= 0) {
+        if (distToPlayer < 28 && this.attackPhase === 'idle') {
           this._attack(player);
         }
-        if (player.health === 'downed' && distToPlayer < 32) {
+        if (player.health === 'downed' && distToPlayer < 32 && this.attackPhase === 'idle') {
           this.state = KILLER_STATE.CARRY;
           this.speed = KILLER_SPEED * 0.7;
           this._findNearestHook(gameMap);
@@ -225,8 +261,13 @@ export class Killer {
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < 4) return;
 
-    const nx = (dx / dist) * this.speed * dt * 60;
-    const ny = (dy / dist) * this.speed * dt * 60;
+    let moveMult = 1;
+    if (this.attackPhase === 'swing') moveMult = 0.5;
+    if (this.attackPhase === 'wipe') moveMult = 0.2;
+    if (this.windowSlowTimer > 0) moveMult = Math.min(moveMult, 0.4);
+
+    const nx = (dx / dist) * this.speed * dt * 60 * moveMult;
+    const ny = (dy / dist) * this.speed * dt * 60 * moveMult;
 
     const newX = this.x + nx;
     const newY = this.y + ny;
@@ -247,8 +288,8 @@ export class Killer {
   }
 
   _attack(player) {
-    player.takeHit();
-    this.attackCooldown = 60;
+    this.attackPhase = 'swing';
+    this.attackTimer = KILLER_ATTACK_WINDUP;
   }
 
   _canSee(player, gameMap) {
@@ -342,6 +383,30 @@ export class Killer {
     const sy = this.y - cameraY;
 
     if (this.stunTimer > 0 && Math.floor(this.stunTimer / 6) % 2 === 0) return;
+
+    // Attack swing arc
+    if (this.attackPhase === 'swing') {
+      const progress = 1 - this.attackTimer / KILLER_ATTACK_WINDUP;
+      ctx.save();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = 0.4 + progress * 0.6;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 24, -0.6, 0.6);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Wipe effect — red glow on hit, white flash on miss
+    if (this.attackPhase === 'wipe') {
+      ctx.save();
+      ctx.globalAlpha = 0.3 + Math.sin(this.attackTimer * 0.3) * 0.2;
+      ctx.fillStyle = this.attackHit ? '#e94560' : '#888';
+      ctx.beginPath();
+      ctx.arc(sx, sy, 20, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
 
     ctx.fillStyle = '#1a1a1a';
     ctx.fillRect(sx - 10, sy - 14, 20, 20);

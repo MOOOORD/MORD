@@ -42,6 +42,7 @@ export class Game {
     if (this.state !== STATE.PLAYING) return;
     this.pulseFrame++;
     if (this.powerFlash > 0) this.powerFlash--;
+    this.objectives.update();
 
     this.player.update(dt, this.keys, this.map);
 
@@ -49,7 +50,7 @@ export class Game {
       const interactable = this.objectives.getNearbyInteractable(this.player.x, this.player.y);
       if (interactable) {
         this.player.interactProgress++;
-        const result = this.objectives.interact(interactable, this.player.interactProgress, this.killer);
+        const result = this.objectives.interact(interactable, this.player.interactProgress, this.killer, this.player);
         if (result) {
           if (result.done) {
             this.player.interactProgress = 0;

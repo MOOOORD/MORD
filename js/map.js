@@ -26,6 +26,7 @@ export class GameMap {
     this._placeExitGates();
     this._placeHooks();
     this._placePallets();
+    this._placeWindows();
     this._buildObstacleList();
   }
 
@@ -209,10 +210,31 @@ export class GameMap {
       }
     }
     this._shuffle(candidates);
-    this.pallets = candidates.slice(0, 10).map(({ r, c }) => {
+    this.pallets = candidates.slice(0, 16).map(({ r, c }) => {
       this.grid[r][c] = TILE.PALLET;
       return { x: c, y: r, dropped: false, broken: false };
     });
+  }
+
+  _placeWindows() {
+    const candidates = [];
+    for (let r = 1; r < this.rows - 1; r++) {
+      for (let c = 1; c < this.cols - 1; c++) {
+        if (this.grid[r][c] !== TILE.WALL) continue;
+        // Window needs floor on two opposite sides so vaulting through is useful
+        const left = this.grid[r][c - 1], right = this.grid[r][c + 1];
+        const up = this.grid[r - 1][c], down = this.grid[r + 1][c];
+        const isFloor = t => t === TILE.FLOOR || t === TILE.GENERATOR || t === TILE.PALLET;
+        if ((isFloor(left) && isFloor(right)) || (isFloor(up) && isFloor(down))) {
+          candidates.push({ r, c });
+        }
+      }
+    }
+    this._shuffle(candidates);
+    const count = Math.min(12, candidates.length);
+    for (let i = 0; i < count; i++) {
+      this.grid[candidates[i].r][candidates[i].c] = TILE.WINDOW;
+    }
   }
 
   _buildObstacleList() {
@@ -244,6 +266,17 @@ export class GameMap {
             ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
             ctx.fillStyle = '#1a1a40';
             ctx.fillRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+            break;
+          case TILE.WINDOW:
+            ctx.fillStyle = '#16213e';
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            ctx.fillStyle = '#2a4a6a';
+            ctx.fillRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+            ctx.fillStyle = '#5a8ab5';
+            ctx.fillRect(sx + 4, sy + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(sx + 6, sy, 4, TILE_SIZE);
+            ctx.fillRect(sx + TILE_SIZE - 10, sy, 4, TILE_SIZE);
             break;
           case TILE.OBSTACLE:
             ctx.fillStyle = '#0f3460';

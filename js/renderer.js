@@ -93,14 +93,18 @@ export class Renderer {
     const level = killer.getHeartbeatLevel(player);
     if (level === 0) return;
 
-    const alpha = level === 1 ? 0.15 : level === 2 ? 0.3 : 0.5;
-    ctx.fillStyle = `rgba(233, 69, 96, ${alpha})`;
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    const alpha = level === 1 ? 0.25 : level === 2 ? 0.45 : 0.7;
+    const cx = CANVAS_WIDTH / 2;
+    const cy = CANVAS_HEIGHT / 2;
+    const maxR = Math.hypot(cx, cy);
 
-    const gradient = ctx.createRadialGradient(CANVAS_WIDTH/2, CANVAS_HEIGHT/2, CANVAS_WIDTH*0.3,
-                                               CANVAS_WIDTH/2, CANVAS_HEIGHT/2, CANVAS_WIDTH*0.7);
+    // Vignette: center clear, red fades in at edges only
+    const gradient = ctx.createRadialGradient(cx, cy, maxR * 0.3, cx, cy, maxR);
     gradient.addColorStop(0, 'transparent');
-    gradient.addColorStop(1, `rgba(233, 69, 96, ${alpha * 1.5})`);
+    gradient.addColorStop(0.5, 'transparent');
+    gradient.addColorStop(0.78, `rgba(233, 69, 96, ${alpha * 0.5})`);
+    gradient.addColorStop(1, `rgba(233, 69, 96, ${alpha})`);
+
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 

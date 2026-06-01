@@ -98,7 +98,6 @@ function drawAvatars() {
 
 function buildMenu() {
   menuButtons.innerHTML = '';
-  // Redraw avatars since the DOM may have been rebuilt
   setTimeout(drawAvatars, 10);
 
   const modeLabel = document.createElement('p');
@@ -117,6 +116,17 @@ function buildMenu() {
   btnScore.textContent = '分数模式';
   btnScore.onclick = () => { gameModeSelection = GAME_MODE.SCORE; buildMapSelect(); };
   menuButtons.appendChild(btnScore);
+
+  const bottomLabel = document.createElement('p');
+  bottomLabel.style.cssText = 'font-size:12px;color:#888;margin:24px 0 8px';
+  bottomLabel.textContent = '—— 其他 ——';
+  menuButtons.appendChild(bottomLabel);
+
+  const btnTutorial = document.createElement('button');
+  btnTutorial.className = 'pixel-btn';
+  btnTutorial.textContent = '游戏教程';
+  btnTutorial.onclick = () => showScreen('tutorial-screen');
+  menuButtons.appendChild(btnTutorial);
 }
 
 function buildMapSelect() {
@@ -166,6 +176,11 @@ function showResult() {
 }
 
 document.getElementById('btn-restart').onclick = () => {
+  showScreen('menu-screen');
+  buildMenu();
+};
+
+document.getElementById('btn-tutorial-back').onclick = () => {
   showScreen('menu-screen');
   buildMenu();
 };

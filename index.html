@@ -34,6 +34,38 @@
   <canvas id="game-canvas"></canvas>
   <div id="hud"></div>
 </div>
+<div id="tutorial-screen" class="screen hidden">
+  <div class="tutorial-box">
+    <h2 class="tutorial-title">游戏教程</h2>
+    <div class="tutorial-section">
+      <h3>—— 操作说明 ——</h3>
+      <div class="ctrl-list">
+        <div class="ctrl-row"><span class="ctrl-key">W A S D</span><span> / </span><span class="ctrl-key">↑ ↓ ← →</span><span> 移动</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">Shift</span><span> 奔跑（消耗体力）</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">Space</span><span> 交互 / 挣扎</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">Esc</span><span> 暂停</span></div>
+      </div>
+    </div>
+    <div class="tutorial-section">
+      <h3>—— 地图图例 ——</h3>
+      <div class="legend-grid">
+        <div class="legend-item"><div class="legend-swatch" style="background:#f0c040"></div><span>发电机</span><span class="legend-hint">修理后给大门通电</span></div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#4ecca3"></div><span>大门</span><span class="legend-hint">通电后可开启逃脱</span></div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#a0522d"></div><span>钩子</span><span class="legend-hint">被挂上后连打空格挣扎</span></div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#ff8c42"></div><span>板子</span><span class="legend-hint">放下可砸晕监管者</span></div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#5a8ab5"></div><span>窗户</span><span class="legend-hint">快速翻越穿墙（杀手较慢）</span></div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#16213e"></div><span>墙壁</span><span class="legend-hint">不可通行</span></div>
+      </div>
+    </div>
+    <div class="tutorial-section">
+      <h3>—— 游戏规则 ——</h3>
+      <p class="tutorial-text">逃生模式：修理 <b>2台发电机</b> 给大门通电，走到已开启的大门即可逃脱。</p>
+      <p class="tutorial-text">分数模式：在 <b>5分钟</b> 内修理发电机、放下板子、逃脱来获取尽可能高的分数。</p>
+      <p class="tutorial-text">受伤后可寻找队友治疗，被击倒后会被挂上钩子——连打空格挣扎逃脱！</p>
+    </div>
+    <button class="pixel-btn" id="btn-tutorial-back">← 返回</button>
+  </div>
+</div>
 <div id="result-screen" class="screen hidden">
   <h2 id="result-title"></h2>
   <p id="result-detail"></p>

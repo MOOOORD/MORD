@@ -1,7 +1,8 @@
 // player.js
 import {
   PLAYER_SPEED, PLAYER_RUN_SPEED, PLAYER_STAMINA, PLAYER_STAMINA_DRAIN,
-  PLAYER_STAMINA_REGEN, PLAYER_INJURED_SPEED, PLAYER_HEALTH
+  PLAYER_STAMINA_REGEN, PLAYER_INJURED_SPEED, PLAYER_HEALTH,
+  PLAYER_HIT_BOOST_SPEED, PLAYER_HIT_BOOST_DURATION
 } from './constants.js';
 
 export class Player {
@@ -14,6 +15,7 @@ export class Player {
     this.hookCount = 0;
     this.hookTimer = 0;
     this.invincibleTimer = 0;
+    this.hitBoostTimer = 0;
     this.interacting = false;
     this.interactTarget = null;
     this.interactProgress = 0;
@@ -28,6 +30,7 @@ export class Player {
     if (this.health === PLAYER_HEALTH.DOWNED || this.health === PLAYER_HEALTH.DEAD) return;
 
     if (this.invincibleTimer > 0) this.invincibleTimer--;
+    if (this.hitBoostTimer > 0) this.hitBoostTimer--;
 
     let mx = 0, my = 0;
     if (keys['KeyW'] || keys['ArrowUp']) my -= 1;
@@ -39,7 +42,11 @@ export class Player {
 
     const running = (keys['ShiftLeft'] || keys['ShiftRight']) && this.stamina > 0;
     let currentSpeed = this.health === PLAYER_HEALTH.INJURED ? PLAYER_INJURED_SPEED : PLAYER_SPEED;
-    if (running) {
+
+    // Hit boost overrides all — massive speed burst after taking a hit
+    if (this.hitBoostTimer > 0) {
+      currentSpeed = PLAYER_HIT_BOOST_SPEED;
+    } else if (running) {
       currentSpeed = PLAYER_RUN_SPEED;
       this.stamina -= PLAYER_STAMINA_DRAIN;
       if (this.stamina < 0) this.stamina = 0;
@@ -79,6 +86,8 @@ export class Player {
 
   takeHit() {
     if (this.invincibleTimer > 0) return false;
+    // Apply speed boost on every hit
+    this.hitBoostTimer = PLAYER_HIT_BOOST_DURATION;
     if (this.health === PLAYER_HEALTH.HEALTHY) {
       this.health = PLAYER_HEALTH.INJURED;
       return true;

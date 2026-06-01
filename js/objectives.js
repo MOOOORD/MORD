@@ -4,6 +4,14 @@ import { TILE_SIZE, REPAIR_TIME, REPAIR_PHASES, GATE_OPEN_TIME } from './constan
 export class ObjectivesManager {
   constructor(gameMap) {
     this.map = gameMap;
+    this.windowCooldowns = {};  // key: "col,row" → remaining frames
+  }
+
+  update() {
+    for (const key in this.windowCooldowns) {
+      this.windowCooldowns[key]--;
+      if (this.windowCooldowns[key] <= 0) delete this.windowCooldowns[key];
+    }
   }
 
   getNearbyInteractable(playerX, playerY) {
@@ -37,12 +45,21 @@ export class ObjectivesManager {
             return { type: 'pallet', obj: pal, x: c, y: r };
           }
         }
+
+        if (tile === 7) {
+          const key = `${c},${r}`;
+          if (this.windowCooldowns[key] && this.windowCooldowns[key] > 0) continue;
+          const dest = this._getVaultDest(c, r, col, row);
+          if (dest) {
+            return { type: 'window', x: c, y: r, dest };
+          }
+        }
       }
     }
     return null;
   }
 
-  interact(interactable, progress, killer) {
+  interact(interactable, progress, killer, player) {
     if (!interactable) return null;
 
     switch (interactable.type) {
@@ -52,6 +69,8 @@ export class ObjectivesManager {
         return this._openGate(interactable.obj, progress);
       case 'pallet':
         return this._dropPallet(interactable.obj, killer);
+      case 'window':
+        return this._vaultWindow(interactable, player);
       default:
         return null;
     }
@@ -105,6 +124,31 @@ export class ObjectivesManager {
       }
     }
     return { done: true, event: 'pallet_dropped' };
+  }
+
+  _getVaultDest(wx, wy, px, py) {
+    const dc = wx - px;
+    const dr = wy - py;
+    const destC = wx + dc;
+    const destR = wy + dr;
+    if (destR < 0 || destR >= this.map.rows || destC < 0 || destC >= this.map.cols) return null;
+    const tile = this.map.grid[destR][destC];
+    const walkable = t => t === 0 || t === 3 || t === 4 || t === 5 || t === 6 || t === 7;
+    if (walkable(tile)) {
+      return { x: destC * TILE_SIZE + TILE_SIZE / 2, y: destR * TILE_SIZE + TILE_SIZE / 2 };
+    }
+    return null;
+  }
+
+  _vaultWindow(windowInfo, player) {
+    if (windowInfo.dest) {
+      player.x = windowInfo.dest.x;
+      player.y = windowInfo.dest.y;
+      player.invincibleTimer = 15;
+      const key = `${windowInfo.x},${windowInfo.y}`;
+      this.windowCooldowns[key] = 180; // 3 seconds before same window can be vaulted again
+    }
+    return { done: true, event: 'window_vaulted' };
   }
 
   areGatesPowered() {
@@ -195,7 +239,7 @@ export class ObjectivesManager {
       ctx.fillRect(sx - 6, sy - 14, 12, 6);
     }
 
-    // Pallets
+    // Pallets — prominent with glow
     for (const pal of this.map.pallets) {
       const sx = pal.x * TILE_SIZE - cameraX + TILE_SIZE / 2;
       const sy = pal.y * TILE_SIZE - cameraY + TILE_SIZE / 2;
@@ -205,10 +249,48 @@ export class ObjectivesManager {
         ctx.fillRect(sx - 6, sy + 2, 12, 4);
       } else if (pal.dropped) {
         ctx.fillStyle = '#ff6b35';
-        ctx.fillRect(sx - 12, sy - 2, 24, 4);
+        ctx.fillRect(sx - 12, sy - 3, 24, 6);
+        ctx.fillStyle = '#ffaa55';
+        ctx.fillRect(sx - 12, sy - 1, 24, 2);
       } else {
-        ctx.fillStyle = '#ff6b35';
-        ctx.fillRect(sx - 1, sy - 10, 2, 20);
+        // Standing pallet — brighter, thicker
+        ctx.fillStyle = '#ff8c42';
+        ctx.fillRect(sx - 3, sy - 12, 6, 24);
+        ctx.fillStyle = '#deb887';
+        ctx.fillRect(sx - 5, sy - 14, 10, 4);
+        // Subtle glow
+        ctx.fillStyle = 'rgba(255, 140, 66, 0.25)';
+        ctx.fillRect(sx - 5, sy - 12, 10, 24);
+      }
+    }
+
+    // Windows — subtle vault indicator, cooldown display
+    for (let r = 0; r < this.map.rows; r++) {
+      for (let c = 0; c < this.map.cols; c++) {
+        if (this.map.grid[r][c] !== 7) continue;
+        const sx = c * TILE_SIZE - cameraX + TILE_SIZE / 2;
+        const sy = r * TILE_SIZE - cameraY + TILE_SIZE / 2;
+        const key = `${c},${r}`;
+        const cd = this.windowCooldowns[key] || 0;
+
+        if (cd > 0) {
+          // On cooldown — dim red
+          ctx.fillStyle = 'rgba(180, 80, 60, 0.3)';
+          ctx.fillRect(sx - 8, sy - 6, 16, 12);
+          ctx.fillStyle = 'rgba(200, 100, 80, 0.4)';
+          ctx.fillRect(sx - 4, sy - 2, 8, 4);
+          // Cooldown bar
+          const cdPct = cd / 180;
+          ctx.fillStyle = '#333';
+          ctx.fillRect(sx - 8, sy - 14, 16, 3);
+          ctx.fillStyle = '#e94560';
+          ctx.fillRect(sx - 8, sy - 14, 16 * cdPct, 3);
+        } else {
+          ctx.fillStyle = 'rgba(120, 180, 220, 0.3)';
+          ctx.fillRect(sx - 8, sy - 6, 16, 12);
+          ctx.fillStyle = 'rgba(180, 220, 255, 0.5)';
+          ctx.fillRect(sx - 4, sy - 2, 8, 4);
+        }
       }
     }
   }
