@@ -1,5 +1,5 @@
 // renderer.js
-import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_HEALTH, GAME_MODE, STATE } from './constants.js';
+import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_HEALTH, GAME_MODE, STATE, PLAYER_VISION_RADIUS } from './constants.js';
 import { canvas, ctx } from './main.js';
 
 export class Renderer {
@@ -52,6 +52,7 @@ export class Renderer {
       this._drawPixelChar(ctx, ksx - 9, ksy - 9, kSprite, 3);
     }
 
+    this._renderVisionMask(game, cx, cy);
     this._renderHeartbeat(player, killer);
     this._renderPowerFlash(game);
     this._renderHUD(game);
@@ -59,6 +60,33 @@ export class Renderer {
     if (game.mode === GAME_MODE.SCORE) {
       this._renderScoreTimer(game);
     }
+  }
+
+  _renderVisionMask(game, camX, camY) {
+    const { player } = game;
+    const px = player.x - camX;
+    const py = player.y - camY;
+    const R = PLAYER_VISION_RADIUS;
+
+    // Solid dark overlay with circular vision hole (evenodd fill rule)
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.arc(px, py, R, 0, Math.PI * 2, true); // counter-clockwise = hole
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.88)';
+    ctx.fill('evenodd');
+    ctx.restore();
+
+    // Soft fade at the vision edge
+    ctx.save();
+    const fade = ctx.createRadialGradient(px, py, R - 25, px, py, R);
+    fade.addColorStop(0, 'rgba(0,0,0,0)');
+    fade.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ctx.beginPath();
+    ctx.arc(px, py, R, 0, Math.PI * 2);
+    ctx.fillStyle = fade;
+    ctx.fill();
+    ctx.restore();
   }
 
   _renderHeartbeat(player, killer) {

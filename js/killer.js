@@ -1,7 +1,8 @@
-// killer.js - AI Killer with 5-state finite state machine
+// killer.js - AI Killer with 5-state finite state machine + smart patrol
 import {
   KILLER_SPEED, KILLER_CHASE_SPEED, KILLER_STATE, TILE_SIZE,
   KILLER_VISION_RANGE, KILLER_HEARING_RANGE, KILLER_ALERT_DURATION,
+  MAP_COLS, MAP_ROWS,
 } from './constants.js';
 
 export class Killer {
@@ -17,6 +18,11 @@ export class Killer {
     this.stunTimer = 0;
     this.attackCooldown = 0;
     this.lastPlayerSeen = null;
+    this.visitedGens = [];
+    this.patrolPause = 0;
+    this.searchPoints = [];
+    this.searchIndex = 0;
+    this.susAreas = [];          // suspicious areas to check
   }
 
   update(dt, player, gameMap) {
@@ -86,8 +92,25 @@ export class Killer {
     if (this.state === KILLER_STATE.ALERT) {
       this.alertTimer--;
       if (this.alertTimer <= 0) {
-        this.state = KILLER_STATE.PATROL;
-        this.alertPos = null;
+        // Generate search pattern around last known position before giving up
+        if (this.alertPos && this.searchPoints.length === 0) {
+          this._generateSearchPoints(this.alertPos, gameMap);
+          this.searchIndex = 0;
+          this._addSusArea(this.alertPos.x, this.alertPos.y);
+        }
+        // Execute search pattern
+        if (this.searchPoints.length > 0 && this.searchIndex < this.searchPoints.length) {
+          const sp = this.searchPoints[this.searchIndex];
+          if (Math.hypot(sp.x - this.x, sp.y - this.y) < 32) {
+            this.searchIndex++;
+          }
+          this.alertTimer = 1; // stay in alert during search
+        } else {
+          this.state = KILLER_STATE.PATROL;
+          this.alertPos = null;
+          this.searchPoints = [];
+          this.searchIndex = 0;
+        }
       }
     }
   }
@@ -98,7 +121,11 @@ export class Killer {
         this._patrol(dt, gameMap);
         break;
       case KILLER_STATE.ALERT:
-        this._moveTo(dt, this.alertPos, gameMap);
+        if (this.searchPoints.length > 0 && this.searchIndex < this.searchPoints.length) {
+          this._moveTo(dt, this.searchPoints[this.searchIndex], gameMap);
+        } else if (this.alertPos) {
+          this._moveTo(dt, this.alertPos, gameMap);
+        }
         break;
       case KILLER_STATE.CHASE:
         this._moveTo(dt, { x: player.x, y: player.y }, gameMap);
@@ -120,17 +147,75 @@ export class Killer {
   }
 
   _patrol(dt, gameMap) {
+    // Pause briefly at each patrol stop to "inspect"
+    if (this.patrolPause > 0) {
+      this.patrolPause--;
+      return;
+    }
+
     if (!this.patrolTarget || this._distToTarget() < 32) {
+      if (this.patrolTarget) {
+        this._markVisited(this.patrolTarget);
+        this.patrolPause = 50 + Math.floor(Math.random() * 40); // 0.8-1.5s inspection
+      }
+
+      // Pick next target: prefer unvisited, far generators to cover ground
       const unrepaired = gameMap.generators.filter(g => !g.repaired);
       if (unrepaired.length > 0) {
-        const g = unrepaired[Math.floor(Math.random() * unrepaired.length)];
+        const g = this._pickBestPatrolTarget(unrepaired);
         this.patrolTarget = { x: g.x * TILE_SIZE + TILE_SIZE / 2, y: g.y * TILE_SIZE + TILE_SIZE / 2 };
       } else {
-        const gate = gameMap.exitGates[Math.floor(Math.random() * gameMap.exitGates.length)];
+        // All gens repaired — patrol between exit gates
+        const gates = gameMap.exitGates;
+        const gate = gates[Math.floor(Math.random() * gates.length)];
         this.patrolTarget = { x: gate.x * TILE_SIZE + TILE_SIZE / 2, y: gate.y * TILE_SIZE + TILE_SIZE / 2 };
       }
     }
     this._moveTo(dt, this.patrolTarget, gameMap);
+  }
+
+  _pickBestPatrolTarget(generators) {
+    const now = Date.now();
+    let best = null;
+    let bestScore = -Infinity;
+
+    for (const g of generators) {
+      const wx = g.x * TILE_SIZE + TILE_SIZE / 2;
+      const wy = g.y * TILE_SIZE + TILE_SIZE / 2;
+      const dist = Math.hypot(wx - this.x, wy - this.y);
+
+      // Penalty for recently visited (decays over 25s)
+      const visit = this.visitedGens.find(v => v.x === g.x && v.y === g.y);
+      const visitedPenalty = visit
+        ? Math.max(0, 1 - (now - visit.time) / 25000)
+        : 0;
+
+      // Score: favor unvisited + farther targets (covers more map area)
+      const score = dist * (1 - visitedPenalty * 0.85);
+      if (score > bestScore) {
+        bestScore = score;
+        best = g;
+      }
+    }
+    return best;
+  }
+
+  _markVisited(target) {
+    const tx = Math.floor(target.x / TILE_SIZE);
+    const ty = Math.floor(target.y / TILE_SIZE);
+    const existing = this.visitedGens.find(v => v.x === tx && v.y === ty);
+    if (existing) {
+      existing.time = Date.now();
+    } else {
+      this.visitedGens.push({ x: tx, y: ty, time: Date.now() });
+    }
+    if (this.visitedGens.length > 20) this.visitedGens.shift();
+  }
+
+  _addSusArea(x, y) {
+    // Remember suspicious locations to revisit later
+    this.susAreas.push({ x, y, time: Date.now() });
+    if (this.susAreas.length > 5) this.susAreas.shift();
   }
 
   _moveTo(dt, target, gameMap) {
@@ -211,6 +296,36 @@ export class Killer {
 
   _dist(px, py) {
     return Math.hypot(px - this.x, py - this.y);
+  }
+
+  _generateSearchPoints(center, gameMap) {
+    this.searchPoints = [];
+    const cx = center.x;
+    const cy = center.y;
+    const steps = [80, 130]; // inner ring + outer ring
+    const angles = [0, Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4, Math.PI, 5 * Math.PI / 4, 3 * Math.PI / 2, 7 * Math.PI / 4];
+    for (const r of steps) {
+      for (const a of angles) {
+        const wx = cx + Math.cos(a) * r;
+        const wy = cy + Math.sin(a) * r;
+        const maxW = gameMap.cols * TILE_SIZE;
+        const maxH = gameMap.rows * TILE_SIZE;
+        if (wx > 32 && wy > 32 && wx < maxW - 32 && wy < maxH - 32) {
+          if (gameMap.isWalkable(wx, wy, false)) {
+            this.searchPoints.push({ x: wx, y: wy });
+          }
+        }
+      }
+    }
+    // Shuffle search points for unpredictable movement
+    for (let i = this.searchPoints.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.searchPoints[i], this.searchPoints[j]] = [this.searchPoints[j], this.searchPoints[i]];
+    }
+  }
+
+  _distToPoint(pt) {
+    return Math.hypot(pt.x - this.x, pt.y - this.y);
   }
 
   getHeartbeatLevel(player) {
