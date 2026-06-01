@@ -16,8 +16,11 @@ export class Game {
     this.objectives = null;
     this.score = 0;
     this.scoreTimer = 0;
+    this.survivalTime = 0;
+    this.gensRepaired = 0;
     this.resultTitle = '';
     this.resultDetail = '';
+    this.resultType = '';   // 'escape' | 'dead' | 'timeout'
     this.keys = {};
     this.pulseFrame = 0;
     this.gatesJustPowered = false;
@@ -33,6 +36,9 @@ export class Game {
     this.objectives = new ObjectivesManager(this.map);
     this.score = 0;
     this.scoreTimer = SCORE_MODE_TIME;
+    this.survivalTime = 0;
+    this.gensRepaired = 0;
+    this.resultType = '';
     this.gatesJustPowered = false;
     this.powerFlash = 0;
     this.state = STATE.PLAYING;
@@ -41,33 +47,33 @@ export class Game {
   update(dt) {
     if (this.state !== STATE.PLAYING) return;
     this.pulseFrame++;
+    this.survivalTime += dt;
     if (this.powerFlash > 0) this.powerFlash--;
     this.objectives.update();
 
     this.player.update(dt, this.keys, this.map);
 
-    if (this.player.interacting) {
-      const interactable = this.objectives.getNearbyInteractable(this.player.x, this.player.y);
-      if (interactable) {
+    // E key — repair generators
+    if (this.keys['KeyE']) {
+      const genTarget = this.objectives.getNearbyInteractable(this.player.x, this.player.y, ['generator']);
+      if (genTarget) {
         this.player.interactProgress++;
-        const result = this.objectives.interact(interactable, this.player.interactProgress, this.killer, this.player);
+        this.player.interacting = true;
+        const result = this.objectives.interact(genTarget, this.player.interactProgress, this.killer, this.player);
         if (result) {
           if (result.done) {
             this.player.interactProgress = 0;
             this.player.interacting = false;
             if (result.event === 'generator_repaired') {
+              this.gensRepaired++;
               if (this.mode === GAME_MODE.SCORE) this.score += 1000;
               if (this.objectives.areGatesPowered()) {
                 this.gatesJustPowered = true;
                 this.powerFlash = 120;
               }
-            } else if (result.event === 'pallet_dropped') {
-              if (this.mode === GAME_MODE.SCORE) this.score += 300;
             }
           } else {
-            // Non-done events during interaction
             if (result.event === 'phase_alert') {
-              // Phase completed — killer learns the survivor's exact position
               this._alertKillerToPlayer();
             } else if (result.spark) {
               if (this.killer.state === 'patrol') {
@@ -80,18 +86,42 @@ export class Game {
         }
       } else {
         this.player.interactProgress = Math.max(0, this.player.interactProgress - 0.5);
+        this.player.interacting = false;
+      }
+    } else if (this.keys['Space']) {
+      // Space — vault windows, drop pallets, open gates, struggle on hook
+      if (this.player.health !== PLAYER_HEALTH.HOOKED) {
+        const interactable = this.objectives.getNearbyInteractable(this.player.x, this.player.y, ['window', 'pallet', 'exit_gate']);
+        if (interactable) {
+          this.player.interactProgress++;
+          this.player.interacting = true;
+          const result = this.objectives.interact(interactable, this.player.interactProgress, this.killer, this.player);
+          if (result) {
+            if (result.done) {
+              this.player.interactProgress = 0;
+              this.player.interacting = false;
+              if (result.event === 'pallet_dropped') {
+                if (this.mode === GAME_MODE.SCORE) this.score += 300;
+              }
+            }
+          }
+        } else {
+          this.player.interactProgress = Math.max(0, this.player.interactProgress - 0.5);
+          this.player.interacting = false;
+        }
       }
     } else {
       this.player.interactProgress = Math.max(0, this.player.interactProgress - 1);
+      this.player.interacting = false;
     }
 
     this.killer.update(dt, this.player, this.map);
 
     if (this.mode === GAME_MODE.SCORE) {
       this.scoreTimer -= dt;
-      if (this.player.interacting) {
-        const ia = this.objectives.getNearbyInteractable(this.player.x, this.player.y);
-        if (ia && ia.type === 'generator') this.score += 20 * dt;
+      if (this.keys['KeyE']) {
+        const ia = this.objectives.getNearbyInteractable(this.player.x, this.player.y, ['generator']);
+        if (ia) this.score += 20 * dt;
       }
     }
 
@@ -118,24 +148,46 @@ export class Game {
   }
 
   _checkEndConditions() {
+    const modeLabel = this.mode === GAME_MODE.ESCAPE ? '逃生模式' : '分数模式';
+    const mapNames = { rooms: '房间走廊', open: '开阔场地', hybrid: '混合式' };
+    const mapName = mapNames[this.mapType] || this.mapType;
+    const timeSec = Math.floor(this.survivalTime);
+    const timeStr = `${Math.floor(timeSec / 60)}分${timeSec % 60}秒`;
+
     if (this.mode === GAME_MODE.ESCAPE && this.objectives.checkEscape(this.player)) {
       this.state = STATE.RESULT;
+      this.resultType = 'escape';
       this.resultTitle = '逃脱成功！';
-      this.resultDetail = '你成功逃出了监管者的追捕';
+      this.resultDetail = JSON.stringify({
+        mode: modeLabel, map: mapName, time: timeStr,
+        gens: this.gensRepaired, score: Math.floor(this.score),
+        health: '幸存',
+      });
       return;
     }
 
     if (this.player.health === PLAYER_HEALTH.DEAD || this.player.hookCount >= 3) {
       this.state = STATE.RESULT;
+      this.resultType = 'dead';
       this.resultTitle = '被淘汰';
-      this.resultDetail = `得分: ${this.score}`;
+      const cause = this.player.hookCount >= 3 ? '挂上钩子三次' : '伤势过重';
+      this.resultDetail = JSON.stringify({
+        mode: modeLabel, map: mapName, time: timeStr,
+        gens: this.gensRepaired, score: Math.floor(this.score),
+        health: cause,
+      });
       return;
     }
 
     if (this.mode === GAME_MODE.SCORE && this.scoreTimer <= 0) {
       this.state = STATE.RESULT;
+      this.resultType = 'timeout';
       this.resultTitle = '时间到！';
-      this.resultDetail = `最终得分: ${Math.floor(this.score)}`;
+      this.resultDetail = JSON.stringify({
+        mode: modeLabel, map: mapName, time: timeStr,
+        gens: this.gensRepaired, score: Math.floor(this.score),
+        health: '存活',
+      });
     }
   }
 

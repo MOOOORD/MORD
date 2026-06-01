@@ -19,8 +19,6 @@ let mapTypeSelection = MAP_TYPE.HYBRID;
 const menuScreen = document.getElementById('menu-screen');
 const gameScreen = document.getElementById('game-screen');
 const resultScreen = document.getElementById('result-screen');
-const resultTitle = document.getElementById('result-title');
-const resultDetail = document.getElementById('result-detail');
 const menuButtons = document.getElementById('menu-buttons');
 
 // --- Pixel Avatar Sprites (16x16, drawn at 5x = 80x80) ---
@@ -170,12 +168,39 @@ function showScreen(id) {
 }
 
 function showResult() {
-  resultTitle.textContent = game.resultTitle;
-  resultDetail.textContent = game.resultDetail;
+  const titleEl = document.getElementById('result-title');
+  const iconEl = document.getElementById('result-icon');
+
+  titleEl.textContent = game.resultTitle;
+  titleEl.className = 'result-title ' + game.resultType;
+
+  const icons = { escape: '🏆', dead: '💀', timeout: '⏰' };
+  iconEl.textContent = icons[game.resultType] || '🎮';
+
+  let stats = {};
+  try { stats = JSON.parse(game.resultDetail); } catch (e) {}
+
+  document.getElementById('stat-mode').textContent = stats.mode || '-';
+  document.getElementById('stat-map').textContent = stats.map || '-';
+  document.getElementById('stat-time').textContent = stats.time || '-';
+  document.getElementById('stat-gens').textContent = stats.gens != null ? `${stats.gens} 台` : '-';
+  document.getElementById('stat-score').textContent = stats.score != null ? stats.score : '-';
+
+  const healthEl = document.getElementById('stat-health');
+  healthEl.textContent = stats.health || '-';
+  healthEl.style.color = stats.health === '幸存' || stats.health === '存活' ? '#4ecca3' : '#e94560';
+
   showScreen('result-screen');
 }
 
 document.getElementById('btn-restart').onclick = () => {
+  game.init(mapTypeSelection, gameModeSelection);
+  showScreen('game-screen');
+  lastTime = 0;
+  accumulator = 0;
+};
+
+document.getElementById('btn-menu').onclick = () => {
   showScreen('menu-screen');
   buildMenu();
 };

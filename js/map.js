@@ -57,20 +57,14 @@ export class GameMap {
     for (const r of rooms) {
       this._carveRoom(r.x, r.y, r.w, r.h);
     }
-    // Corridors connecting rooms
+    // Corridors connecting rooms — 1 tile wide to create chokepoints
     this._carveCorridor(9, 4, 20, 4, 1);
-    this._carveCorridor(9, 5, 20, 5, 1);
     this._carveCorridor(9, 16, 20, 16, 1);
-    this._carveCorridor(9, 17, 20, 17, 1);
     this._carveCorridor(5, 7, 5, 14, 1);
-    this._carveCorridor(6, 7, 6, 14, 1);
     this._carveCorridor(24, 7, 24, 14, 1);
-    this._carveCorridor(25, 7, 25, 14, 1);
-    // Connect center room
-    this.grid[11][17] = TILE.FLOOR;
-    this.grid[11][16] = TILE.FLOOR;
-    this.grid[11][12] = TILE.FLOOR;
-    this.grid[11][13] = TILE.FLOOR;
+    // Connect center room — carve 1-wide openings through its walls
+    this.grid[11][12] = TILE.FLOOR; // left wall
+    this.grid[11][17] = TILE.FLOOR; // right wall
   }
 
   _genOpen() {
@@ -115,11 +109,19 @@ export class GameMap {
         }
       }
     }
-    // Door openings in rooms toward center
-    this.grid[4][10] = TILE.FLOOR; this.grid[4][11] = TILE.FLOOR;
-    this.grid[4][21] = TILE.FLOOR; this.grid[4][20] = TILE.FLOOR;
-    this.grid[17][10] = TILE.FLOOR; this.grid[17][11] = TILE.FLOOR;
-    this.grid[17][21] = TILE.FLOOR; this.grid[17][20] = TILE.FLOOR;
+    // Door openings in room walls — 1-wide chokepoints
+    // Top-left room (2,2,7,5): right wall x=8, bottom wall y=6
+    this.grid[4][8] = TILE.FLOOR;
+    this.grid[6][4] = TILE.FLOOR;
+    // Top-right room (21,2,7,5): left wall x=21, bottom wall y=6
+    this.grid[4][21] = TILE.FLOOR;
+    this.grid[6][24] = TILE.FLOOR;
+    // Bottom-left room (2,15,7,5): right wall x=8, top wall y=15
+    this.grid[17][8] = TILE.FLOOR;
+    this.grid[15][4] = TILE.FLOOR;
+    // Bottom-right room (21,15,7,5): left wall x=21, top wall y=15
+    this.grid[17][21] = TILE.FLOOR;
+    this.grid[15][24] = TILE.FLOOR;
   }
 
   _carveRoom(x, y, w, h) {
@@ -198,18 +200,21 @@ export class GameMap {
 
   _placePallets() {
     const candidates = [];
+    const isBlocked = t => t === TILE.WALL || t === TILE.OBSTACLE;
+
     for (let r = 2; r < this.rows - 2; r++) {
       for (let c = 2; c < this.cols - 2; c++) {
-        if (this.grid[r][c] === TILE.FLOOR) {
-          const nearWall = this.grid[r-1][c] === TILE.WALL || this.grid[r+1][c] === TILE.WALL ||
-                           this.grid[r][c-1] === TILE.WALL || this.grid[r][c+1] === TILE.WALL;
-          const nearObs = this.grid[r-1][c] === TILE.OBSTACLE || this.grid[r+1][c] === TILE.OBSTACLE ||
-                          this.grid[r][c-1] === TILE.OBSTACLE || this.grid[r][c+1] === TILE.OBSTACLE;
-          if (nearWall || nearObs) candidates.push({ r, c });
+        if (this.grid[r][c] !== TILE.FLOOR) continue;
+        const n = isBlocked(this.grid[r-1][c]), s = isBlocked(this.grid[r+1][c]);
+        const w = isBlocked(this.grid[r][c-1]), e = isBlocked(this.grid[r][c+1]);
+        const blocked = n + s + w + e;
+        if (blocked >= 2) {
+          candidates.push({ r, c, blocked });
         }
       }
     }
-    this._shuffle(candidates);
+    // Sort by blocked count (descending) — choke points first, room interiors (0 blocked) excluded
+    candidates.sort((a, b) => b.blocked - a.blocked);
     this.pallets = candidates.slice(0, 16).map(({ r, c }) => {
       this.grid[r][c] = TILE.PALLET;
       return { x: c, y: r, dropped: false, broken: false };
@@ -313,6 +318,7 @@ export class GameMap {
     if (r < 0 || r >= this.rows || c < 0 || c >= this.cols) return false;
     const tile = this.grid[r][c];
     if (tile === TILE.WALL || tile === TILE.OBSTACLE) return false;
+    if (tile === TILE.WINDOW && isPlayer) return false;
     if (!isPlayer) {
       const pallet = this.pallets.find(p => p.x === c && p.y === r && p.dropped && !p.broken);
       if (pallet) return false;

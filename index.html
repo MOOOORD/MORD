@@ -42,7 +42,8 @@
       <div class="ctrl-list">
         <div class="ctrl-row"><span class="ctrl-key">W A S D</span><span> / </span><span class="ctrl-key">↑ ↓ ← →</span><span> 移动</span></div>
         <div class="ctrl-row"><span class="ctrl-key">Shift</span><span> 奔跑（消耗体力）</span></div>
-        <div class="ctrl-row"><span class="ctrl-key">Space</span><span> 交互 / 挣扎</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">Space</span><span> 翻窗 / 放下板子 / 挣扎</span></div>
+        <div class="ctrl-row"><span class="ctrl-key">E</span><span> 修理发电机</span></div>
         <div class="ctrl-row"><span class="ctrl-key">Esc</span><span> 暂停</span></div>
       </div>
     </div>
@@ -67,9 +68,20 @@
   </div>
 </div>
 <div id="result-screen" class="screen hidden">
-  <h2 id="result-title"></h2>
-  <p id="result-detail"></p>
-  <button id="btn-restart">再来一局</button>
+  <h2 id="result-title" class="result-title"></h2>
+  <div id="result-icon"></div>
+  <div class="result-stats">
+    <div class="stat-row"><span class="stat-label">模式</span><span id="stat-mode">-</span></div>
+    <div class="stat-row"><span class="stat-label">地图</span><span id="stat-map">-</span></div>
+    <div class="stat-row"><span class="stat-label">存活</span><span id="stat-time">-</span></div>
+    <div class="stat-row"><span class="stat-label">修理</span><span id="stat-gens">-</span></div>
+    <div class="stat-row"><span class="stat-label">得分</span><span id="stat-score">-</span></div>
+    <div class="stat-row"><span class="stat-label">状态</span><span id="stat-health">-</span></div>
+  </div>
+  <div class="result-buttons">
+    <button class="pixel-btn" id="btn-restart">再来一局</button>
+    <button class="pixel-btn" id="btn-menu">返回主菜单</button>
+  </div>
 </div>
 <script type="module" src="js/main.js"></script>
 </body>

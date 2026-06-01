@@ -14,7 +14,7 @@ export class ObjectivesManager {
     }
   }
 
-  getNearbyInteractable(playerX, playerY) {
+  getNearbyInteractable(playerX, playerY, types = null) {
     const col = Math.floor(playerX / TILE_SIZE);
     const row = Math.floor(playerY / TILE_SIZE);
 
@@ -25,28 +25,28 @@ export class ObjectivesManager {
         if (r < 0 || r >= this.map.rows || c < 0 || c >= this.map.cols) continue;
         const tile = this.map.grid[r][c];
 
-        if (tile === 3) {
+        if (tile === 3 && (!types || types.includes('generator'))) {
           const gen = this.map.generators.find(g => g.x === c && g.y === r);
           if (gen && !gen.repaired) {
             return { type: 'generator', obj: gen, x: c, y: r };
           }
         }
 
-        if (tile === 5) {
+        if (tile === 5 && (!types || types.includes('exit_gate'))) {
           const gate = this.map.exitGates.find(g => g.x === c && g.y === r);
           if (gate && gate.powered && !gate.open) {
             return { type: 'exit_gate', obj: gate, x: c, y: r };
           }
         }
 
-        if (tile === 6) {
+        if (tile === 6 && (!types || types.includes('pallet'))) {
           const pal = this.map.pallets.find(p => p.x === c && p.y === r);
           if (pal && !pal.dropped && !pal.broken) {
             return { type: 'pallet', obj: pal, x: c, y: r };
           }
         }
 
-        if (tile === 7) {
+        if (tile === 7 && (!types || types.includes('window'))) {
           const key = `${c},${r}`;
           if (this.windowCooldowns[key] && this.windowCooldowns[key] > 0) continue;
           const dest = this._getVaultDest(c, r, col, row);
@@ -133,7 +133,7 @@ export class ObjectivesManager {
     const destR = wy + dr;
     if (destR < 0 || destR >= this.map.rows || destC < 0 || destC >= this.map.cols) return null;
     const tile = this.map.grid[destR][destC];
-    const walkable = t => t === 0 || t === 3 || t === 4 || t === 5 || t === 6 || t === 7;
+    const walkable = t => t === 0 || t === 3 || t === 4 || t === 5 || t === 6;
     if (walkable(tile)) {
       return { x: destC * TILE_SIZE + TILE_SIZE / 2, y: destR * TILE_SIZE + TILE_SIZE / 2 };
     }

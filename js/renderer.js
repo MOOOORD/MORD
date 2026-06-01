@@ -109,9 +109,9 @@ export class Renderer {
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     const beats = ['♥', '♥♥', '♥♥♥'][level - 1];
-    ctx.font = '20px monospace';
+    ctx.font = '26px monospace';
     ctx.fillStyle = '#e94560';
-    ctx.fillText(beats, CANVAS_WIDTH - 60, 30);
+    ctx.fillText(beats, CANVAS_WIDTH - 70, 34);
   }
 
   _renderPowerFlash(game) {
@@ -119,7 +119,7 @@ export class Renderer {
       const alpha = game.powerFlash / 120 * 0.4;
       ctx.fillStyle = `rgba(240, 192, 64, ${alpha})`;
       ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-      ctx.font = '24px "Press Start 2P", monospace';
+      ctx.font = '30px "Press Start 2P", monospace';
       ctx.fillStyle = '#f0c040';
       ctx.textAlign = 'center';
       ctx.fillText('大门已通电！', CANVAS_WIDTH / 2, CANVAS_HEIGHT - 40);
@@ -130,7 +130,7 @@ export class Renderer {
   _renderHUD(game) {
     const { player, map } = game;
 
-    ctx.font = '16px monospace';
+    ctx.font = '22px monospace';
     ctx.fillStyle = '#fff';
     if (player.health === PLAYER_HEALTH.HEALTHY) {
       ctx.fillText('❤️❤️', 16, 30);
@@ -152,9 +152,9 @@ export class Renderer {
     }
 
     const repaired = map.generators.filter(g => g.repaired).length;
-    ctx.font = '14px monospace';
+    ctx.font = '18px monospace';
     ctx.fillStyle = '#f0c040';
-    ctx.fillText(`⚙ ${repaired}/5  (需2台通电)`, CANVAS_WIDTH - 220, 30);
+    ctx.fillText(`⚙ ${repaired}/5  (需2台通电)`, CANVAS_WIDTH - 240, 30);
 
     const powered = map.exitGates[0].powered;
     const open = map.exitGates.some(g => g.open);
@@ -173,7 +173,7 @@ export class Renderer {
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 1;
       ctx.strokeRect(bx, by, barW, barH);
-      ctx.font = '10px monospace';
+      ctx.font = '14px monospace';
       ctx.fillStyle = '#fff';
       ctx.textAlign = 'center';
       ctx.fillText('按住空格...', CANVAS_WIDTH / 2, by - 4);
@@ -181,10 +181,10 @@ export class Renderer {
     }
 
     if (player.health === PLAYER_HEALTH.HOOKED) {
-      ctx.font = '20px "Press Start 2P", monospace';
+      ctx.font = '26px "Press Start 2P", monospace';
       ctx.fillStyle = '#e94560';
       ctx.textAlign = 'center';
-      ctx.fillText('连按空格挣扎！', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 40);
+      ctx.fillText('连按空格挣扎！', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 50);
       const barW = 300, barH = 16;
       ctx.fillStyle = '#333';
       ctx.fillRect(CANVAS_WIDTH / 2 - barW / 2, CANVAS_HEIGHT / 2 - 8, barW, barH);
@@ -195,32 +195,32 @@ export class Renderer {
     }
 
     if (game.mode === GAME_MODE.SCORE) {
-      ctx.font = '14px monospace';
+      ctx.font = '18px monospace';
       ctx.fillStyle = '#f0c040';
-      ctx.fillText(`得分: ${Math.floor(game.score)}`, 16, 72);
+      ctx.fillText(`得分: ${Math.floor(game.score)}`, 16, 76);
     }
   }
 
   _renderScoreTimer(game) {
     const mins = Math.floor(game.scoreTimer / 60);
     const secs = Math.floor(game.scoreTimer % 60);
-    ctx.font = '20px "Press Start 2P", monospace';
+    ctx.font = '26px "Press Start 2P", monospace';
     ctx.fillStyle = game.scoreTimer < 30 ? '#e94560' : '#fff';
     ctx.textAlign = 'center';
     ctx.fillText(`${mins}:${String(secs).padStart(2, '0')}`,
-                 CANVAS_WIDTH / 2, 40);
+                 CANVAS_WIDTH / 2, 44);
     ctx.textAlign = 'start';
   }
 
   _renderPauseOverlay() {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    ctx.font = '32px "Press Start 2P", monospace';
+    ctx.font = '42px "Press Start 2P", monospace';
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
-    ctx.fillText('暂停', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
-    ctx.font = '14px "Press Start 2P", monospace';
-    ctx.fillText('按 Esc 继续', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30);
+    ctx.fillText('暂停', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 24);
+    ctx.font = '18px "Press Start 2P", monospace';
+    ctx.fillText('按 Esc 继续', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 36);
     ctx.textAlign = 'start';
   }
 

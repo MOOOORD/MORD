@@ -3,7 +3,7 @@ import {
   KILLER_SPEED, KILLER_CHASE_SPEED, KILLER_STATE, TILE, TILE_SIZE,
   KILLER_VISION_RANGE, KILLER_HEARING_RANGE, KILLER_ALERT_DURATION,
   KILLER_ATTACK_WINDUP, KILLER_MISS_WIPE, KILLER_HIT_WIPE,
-  MAP_COLS, MAP_ROWS,
+  MAP_COLS, MAP_ROWS, PLAYER_HEALTH,
 } from './constants.js';
 
 export class Killer {
@@ -22,6 +22,10 @@ export class Killer {
     this.attackHit = false;       // whether the swing connected
     this.windowSlowTimer = 0;     // slowdown frames after vaulting a window
     this._lastTile = -1;
+    this._path = null;            // A* path waypoints
+    this._pathKey = '';           // cache key for path target
+    this._pathIndex = 0;
+    this._pathTimer = 0;          // frames since last path compute
     this.lastPlayerSeen = null;
     this.visitedGens = [];
     this.patrolPause = 0;
@@ -56,10 +60,18 @@ export class Killer {
       if (this.attackPhase === 'swing') {
         const dist = this._dist(player.x, player.y);
         if (dist < 32 && this._canSee(player, gameMap)) {
+          const wasInjured = player.health === PLAYER_HEALTH.INJURED;
           player.takeHit();
           this.attackPhase = 'wipe';
           this.attackTimer = KILLER_HIT_WIPE;
           this.attackHit = true;
+          // Immediately pick up downed player instead of waiting for wipe to end
+          if (wasInjured && player.health === PLAYER_HEALTH.DOWNED) {
+            this.state = KILLER_STATE.CARRY;
+            this.speed = KILLER_SPEED * 0.7;
+            this._findNearestHook(gameMap);
+            this._clearPath();
+          }
         } else {
           this.attackPhase = 'wipe';
           this.attackTimer = KILLER_MISS_WIPE;
@@ -96,6 +108,7 @@ export class Killer {
           this.alertPos = this.lastPlayerSeen ? { ...this.lastPlayerSeen } : { x: player.x, y: player.y };
           this.alertTimer = KILLER_ALERT_DURATION;
           this.speed = KILLER_SPEED;
+          this._clearPath();
         } else {
           this.lastPlayerSeen = { x: player.x, y: player.y };
         }
@@ -117,12 +130,28 @@ export class Killer {
             this.state = KILLER_STATE.PATROL;
             this.speed = KILLER_SPEED;
             this.carryTarget = null;
+            this._clearPath();
           }
         }
         break;
 
       case KILLER_STATE.BREAK:
         break;
+    }
+
+    // Global: if player is downed, always try to pick them up
+    if (player.health === 'downed' && this.attackPhase === 'idle'
+        && this.state !== KILLER_STATE.CARRY && this.state !== KILLER_STATE.BREAK) {
+      if (distToPlayer < 64) {
+        this.state = KILLER_STATE.CARRY;
+        this.speed = KILLER_SPEED * 0.7;
+        this._findNearestHook(gameMap);
+      } else if (canSeePlayer) {
+        // Player downed but far — chase them first
+        this.state = KILLER_STATE.CHASE;
+        this.speed = KILLER_CHASE_SPEED;
+        this.lastPlayerSeen = { x: player.x, y: player.y };
+      }
     }
 
     if (this.state === KILLER_STATE.ALERT) {
@@ -256,28 +285,22 @@ export class Killer {
 
   _moveTo(dt, target, gameMap) {
     if (!target) return;
-    const dx = target.x - this.x;
-    const dy = target.y - this.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < 4) return;
 
     let moveMult = 1;
     if (this.attackPhase === 'swing') moveMult = 0.5;
     if (this.attackPhase === 'wipe') moveMult = 0.2;
     if (this.windowSlowTimer > 0) moveMult = Math.min(moveMult, 0.4);
 
-    const nx = (dx / dist) * this.speed * dt * 60 * moveMult;
-    const ny = (dy / dist) * this.speed * dt * 60 * moveMult;
+    const needPath = this.state === KILLER_STATE.CHASE || this.state === KILLER_STATE.CARRY;
+    if (needPath) {
+      this._moveWithPathfinding(dt, target, gameMap, moveMult);
+    } else {
+      this._moveDirect(dt, target, gameMap, moveMult);
+    }
 
-    const newX = this.x + nx;
-    const newY = this.y + ny;
-
-    if (gameMap.isWalkable(newX, this.y, false)) this.x = newX;
-    if (gameMap.isWalkable(this.x, newY, false)) this.y = newY;
-
-    // Check for dropped pallets — break them
-    const tileCol = Math.floor(newX / TILE_SIZE);
-    const tileRow = Math.floor(newY / TILE_SIZE);
+    // Check for dropped pallets — always break through
+    const tileCol = Math.floor(this.x / TILE_SIZE);
+    const tileRow = Math.floor(this.y / TILE_SIZE);
     const pallet = gameMap.pallets.find(p =>
       p.x === tileCol && p.y === tileRow && p.dropped && !p.broken
     );
@@ -285,6 +308,140 @@ export class Killer {
       pallet.broken = true;
       this.state = KILLER_STATE.BREAK;
     }
+  }
+
+  _moveDirect(dt, target, gameMap, moveMult) {
+    const dx = target.x - this.x;
+    const dy = target.y - this.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 4) return;
+
+    const speed = this.speed * dt * 60 * moveMult;
+    const nx = (dx / dist) * speed;
+    const ny = (dy / dist) * speed;
+
+    const newX = this.x + nx;
+    const newY = this.y + ny;
+
+    const canMoveX = gameMap.isWalkable(newX, this.y, false);
+    const canMoveY = gameMap.isWalkable(this.x, newY, false);
+
+    if (canMoveX) this.x = newX;
+    if (canMoveY) this.y = newY;
+
+    if (!canMoveX && !canMoveY) {
+      // Wall-slide: try all 4 cardinal directions, pick best toward target
+      const dirs = [[speed, 0], [-speed, 0], [0, speed], [0, -speed]];
+      let bestDir = null;
+      let bestDist = Infinity;
+      for (const [sx, sy] of dirs) {
+        const tx = this.x + sx;
+        const ty = this.y + sy;
+        if (gameMap.isWalkable(tx, ty, false)) {
+          const d = Math.hypot(tx - target.x, ty - target.y);
+          if (d < bestDist) { bestDist = d; bestDir = [tx, ty]; }
+        }
+      }
+      if (bestDir) { this.x = bestDir[0]; this.y = bestDir[1]; }
+    }
+  }
+
+  _moveWithPathfinding(dt, target, gameMap, moveMult) {
+    const tx = Math.floor(target.x / TILE_SIZE);
+    const ty = Math.floor(target.y / TILE_SIZE);
+    const pathKey = `${tx},${ty}`;
+
+    this._pathTimer++;
+    if (!this._path || this._pathKey !== pathKey || this._pathTimer > 45) {
+      this._path = this._findPath(gameMap, tx, ty);
+      this._pathKey = pathKey;
+      this._pathIndex = 0;
+      this._pathTimer = 0;
+    }
+
+    if (!this._path || this._path.length === 0) {
+      this._moveDirect(dt, target, gameMap, moveMult);
+      return;
+    }
+
+    // Advance past reached waypoints
+    while (this._pathIndex < this._path.length) {
+      const wp = this._path[this._pathIndex];
+      if (Math.hypot(wp.x - this.x, wp.y - this.y) < 12) {
+        this._pathIndex++;
+      } else break;
+    }
+
+    if (this._pathIndex >= this._path.length) {
+      this._moveDirect(dt, target, gameMap, moveMult);
+      return;
+    }
+
+    this._moveDirect(dt, this._path[this._pathIndex], gameMap, moveMult);
+  }
+
+  _findPath(gameMap, ex, ey) {
+    const sx = Math.floor(this.x / TILE_SIZE);
+    const sy = Math.floor(this.y / TILE_SIZE);
+    if (sx === ex && sy === ey) return null;
+
+    const key = (x, y) => `${x},${y}`;
+    const h = (x, y) => Math.abs(x - ex) + Math.abs(y - ey);
+
+    const open = [{ x: sx, y: sy, g: 0, f: h(sx, sy) }];
+    const cameFrom = {};
+    const gScore = { [key(sx, sy)]: 0 };
+    const closed = new Set();
+
+    while (open.length > 0 && open.length < 600) {
+      let best = 0;
+      for (let i = 1; i < open.length; i++)
+        if (open[i].f < open[best].f) best = i;
+      const cur = open.splice(best, 1)[0];
+      const ck = key(cur.x, cur.y);
+
+      if (cur.x === ex && cur.y === ey) {
+        const path = [];
+        let k = ck;
+        while (k !== key(sx, sy)) {
+          const [cx, cy] = k.split(',').map(Number);
+          path.unshift({ x: cx * TILE_SIZE + TILE_SIZE / 2, y: cy * TILE_SIZE + TILE_SIZE / 2 });
+          k = cameFrom[k];
+        }
+        return path;
+      }
+
+      closed.add(ck);
+      const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+      for (const [dx, dy] of dirs) {
+        const nx = cur.x + dx, ny = cur.y + dy;
+        const nk = key(nx, ny);
+        if (nx < 0 || nx >= MAP_COLS || ny < 0 || ny >= MAP_ROWS) continue;
+        if (closed.has(nk)) continue;
+        const wx = nx * TILE_SIZE + TILE_SIZE / 2;
+        const wy = ny * TILE_SIZE + TILE_SIZE / 2;
+        if (!gameMap.isWalkable(wx, wy, false)) continue;
+
+        const tg = gScore[ck] + 1;
+        if (tg < (gScore[nk] || Infinity)) {
+          gScore[nk] = tg;
+          cameFrom[nk] = ck;
+          const f = tg + h(nx, ny);
+          const existing = open.find(o => o.x === nx && o.y === ny);
+          if (existing) { existing.g = tg; existing.f = f; }
+          else open.push({ x: nx, y: ny, g: tg, f: f });
+        }
+      }
+    }
+
+    return null; // no path found
+  }
+
+  _clearPath() {
+    this._path = null;
+    this._pathKey = '';
+    this._pathIndex = 0;
+    this._pathTimer = 0;
   }
 
   _attack(player) {
