@@ -57,19 +57,19 @@ export class GameMap {
       this._carveRoom(r.x, r.y, r.w, r.h);
     }
     // Corridors connecting rooms
-    this._carveCorridor(10, 4, 20, 4, 1);
-    this._carveCorridor(10, 5, 20, 5, 1);
-    this._carveCorridor(10, 16, 20, 16, 1);
-    this._carveCorridor(10, 17, 20, 17, 1);
-    this._carveCorridor(5, 8, 5, 14, 1);
-    this._carveCorridor(6, 8, 6, 14, 1);
-    this._carveCorridor(24, 8, 24, 14, 1);
-    this._carveCorridor(25, 8, 25, 14, 1);
+    this._carveCorridor(9, 4, 20, 4, 1);
+    this._carveCorridor(9, 5, 20, 5, 1);
+    this._carveCorridor(9, 16, 20, 16, 1);
+    this._carveCorridor(9, 17, 20, 17, 1);
+    this._carveCorridor(5, 7, 5, 14, 1);
+    this._carveCorridor(6, 7, 6, 14, 1);
+    this._carveCorridor(24, 7, 24, 14, 1);
+    this._carveCorridor(25, 7, 25, 14, 1);
     // Connect center room
-    this.grid[11][18] = TILE.FLOOR;
-    this.grid[11][19] = TILE.FLOOR;
-    this.grid[11][10] = TILE.FLOOR;
-    this.grid[11][11] = TILE.FLOOR;
+    this.grid[11][17] = TILE.FLOOR;
+    this.grid[11][16] = TILE.FLOOR;
+    this.grid[11][12] = TILE.FLOOR;
+    this.grid[11][13] = TILE.FLOOR;
   }
 
   _genOpen() {
