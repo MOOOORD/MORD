@@ -49,6 +49,63 @@ body { background: #0a0a0a; color: #e0e0e0; font-family: 'Press Start 2P', monos
   50% { opacity: 1; color: #aaa; }
 }
 
+/* --- Character Showcase --- */
+#character-showcase {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 32px;
+  padding: 0 20px;
+}
+
+.char-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 180px;
+  text-align: center;
+}
+
+.char-avatar {
+  image-rendering: pixelated;
+  border: 3px solid #333;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  background: #111;
+}
+
+.survivor .char-avatar { border-color: #4ecdc4; box-shadow: 0 0 12px rgba(78,205,196,0.3); }
+.killer .char-avatar { border-color: #e94560; box-shadow: 0 0 12px rgba(233,69,96,0.3); }
+
+.char-name {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  margin-bottom: 6px;
+  letter-spacing: 2px;
+}
+
+.char-tagline {
+  font-size: 9px;
+  color: #777;
+  line-height: 1.5;
+  letter-spacing: 1px;
+}
+
+.char-vs {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 20px;
+  color: #e94560;
+  align-self: center;
+  text-shadow: 0 0 10px rgba(233,69,96,0.5);
+  animation: vsPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes vsPulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+
 /* --- Buttons --- */
 .pixel-btn {
   font-family: 'Press Start 2P', monospace;
