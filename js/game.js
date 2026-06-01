@@ -1,5 +1,5 @@
 // game.js
-import { STATE, GAME_MODE, PLAYER_HEALTH, SCORE_MODE_TIME } from './constants.js';
+import { STATE, GAME_MODE, PLAYER_HEALTH, SCORE_MODE_TIME, KILLER_SPEED } from './constants.js';
 import { GameMap } from './map.js';
 import { Player } from './player.js';
 import { Killer } from './killer.js';
@@ -63,11 +63,17 @@ export class Game {
             } else if (result.event === 'pallet_dropped') {
               if (this.mode === GAME_MODE.SCORE) this.score += 300;
             }
-          } else if (result.spark) {
-            if (this.killer.state === 'patrol') {
-              this.killer.state = 'alert';
-              this.killer.alertPos = { x: this.player.x, y: this.player.y };
-              this.killer.alertTimer = 120;
+          } else {
+            // Non-done events during interaction
+            if (result.event === 'phase_alert') {
+              // Phase completed — killer learns the survivor's exact position
+              this._alertKillerToPlayer();
+            } else if (result.spark) {
+              if (this.killer.state === 'patrol') {
+                this.killer.state = 'alert';
+                this.killer.alertPos = { x: this.player.x, y: this.player.y };
+                this.killer.alertTimer = 120;
+              }
             }
           }
         }
@@ -138,6 +144,21 @@ export class Game {
 
   handleKeyUp(code) {
     this.keys[code] = false;
+  }
+
+  _alertKillerToPlayer() {
+    // Force killer to know the player's exact position and enter alert/chase
+    const k = this.killer;
+    k.alertPos = { x: this.player.x, y: this.player.y };
+    k.lastPlayerSeen = { x: this.player.x, y: this.player.y };
+    k.alertTimer = 300; // 5 seconds to investigate
+    // Clear any search state so it goes straight to the player
+    k.searchPoints = [];
+    k.searchIndex = 0;
+    if (k.state !== 'carry' && k.state !== 'break') {
+      k.state = 'alert';
+      k.speed = KILLER_SPEED;
+    }
   }
 
   togglePause() {

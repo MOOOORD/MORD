@@ -1,5 +1,5 @@
 // objectives.js
-import { TILE_SIZE, REPAIR_TIME, GATE_OPEN_TIME } from './constants.js';
+import { TILE_SIZE, REPAIR_TIME, REPAIR_PHASES, GATE_OPEN_TIME } from './constants.js';
 
 export class ObjectivesManager {
   constructor(gameMap) {
@@ -58,11 +58,32 @@ export class ObjectivesManager {
   }
 
   _repairGenerator(gen, progress) {
+    // Initialize phase tracking on first interaction
+    if (gen.phase === undefined) gen.phase = -1;
+
+    const phaseSize = REPAIR_TIME / REPAIR_PHASES; // 300 frames per phase
+    const currentPhase = Math.min(REPAIR_PHASES - 1, Math.floor(progress / phaseSize));
+
+    // Fire alert on each new phase reached (except final completion)
+    if (currentPhase > gen.phase && currentPhase < REPAIR_PHASES - 1) {
+      gen.phase = currentPhase;
+      return { done: false, event: 'phase_alert', phase: currentPhase + 1, phaseTotal: REPAIR_PHASES };
+    }
+
+    if (currentPhase > gen.phase) {
+      gen.phase = currentPhase;
+    }
+
+    // Generator fully repaired
     if (progress >= REPAIR_TIME) {
       gen.repaired = true;
+      gen.phase = REPAIR_PHASES;
       return { done: true, event: 'generator_repaired' };
     }
-    const spark = Math.random() < 0.02;
+
+    // Spark chance increases with phase progress
+    const sparkChance = 0.01 + gen.phase * 0.03; // 1%, 4%, 7% per phase
+    const spark = Math.random() < sparkChance;
     return { done: false, spark };
   }
 
@@ -112,17 +133,32 @@ export class ObjectivesManager {
     for (const gen of this.map.generators) {
       const sx = gen.x * TILE_SIZE - cameraX + TILE_SIZE / 2;
       const sy = gen.y * TILE_SIZE - cameraY + TILE_SIZE / 2;
+      const phase = gen.phase || 0;
+
       if (gen.repaired) {
+        // Fully repaired — green
         ctx.fillStyle = '#4ecca3';
-        ctx.fillRect(sx - 8, sy - 8, 16, 16);
+        ctx.fillRect(sx - 10, sy - 10, 20, 20);
         ctx.fillStyle = '#fff';
-        ctx.fillRect(sx - 4, sy - 4, 8, 8);
+        ctx.fillRect(sx - 5, sy - 5, 10, 10);
       } else {
-        ctx.fillStyle = '#f0c040';
-        ctx.fillRect(sx - 8, sy - 8, 16, 16);
-        if (pulseFrame % 30 < 15) {
+        // Phase-based color: yellow → orange → red-orange
+        const colors = ['#f0c040', '#f0a030', '#f06030'];
+        ctx.fillStyle = colors[phase] || '#f0c040';
+        ctx.fillRect(sx - 10, sy - 10, 20, 20);
+
+        // Phase indicator pips (small dots showing progress)
+        for (let p = 0; p < REPAIR_PHASES; p++) {
+          ctx.fillStyle = p <= phase ? '#fff' : '#333';
+          ctx.fillRect(sx - 6 + p * 6, sy - 16, 4, 3);
+        }
+
+        // Sparking — faster at higher phases
+        const sparkIntervals = [40, 25, 12]; // phase 0, 1, 2
+        const interval = sparkIntervals[phase] || 40;
+        if (pulseFrame % interval < interval / 2) {
           ctx.fillStyle = '#fff';
-          ctx.fillRect(sx - 2, sy - 14, 4, 4);
+          ctx.fillRect(sx - 2, sy - 18, 4, 5); // spark above generator
         }
       }
     }

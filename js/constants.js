@@ -24,7 +24,8 @@ export const KILLER_SPEED = 2.8;       // slightly faster than normal walk
 export const KILLER_CHASE_SPEED = 3.2;
 export const PLAYER_INJURED_SPEED = 2.0;
 
-export const REPAIR_TIME = 180;        // frames (3 seconds at 60fps)
+export const REPAIR_TIME = 900;        // frames (15 seconds at 60fps), 3 phases of 5s each
+export const REPAIR_PHASES = 3;
 export const GATE_OPEN_TIME = 240;     // frames (4 seconds)
 export const HOOK_STRUGGLE_TIME = 120; // frames
 export const HOOK_ESCAPE_CHANCE = 0.12;

@@ -1,5 +1,5 @@
 // renderer.js
-import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_HEALTH, GAME_MODE, STATE, PLAYER_VISION_RADIUS } from './constants.js';
+import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_HEALTH, GAME_MODE, STATE, PLAYER_VISION_RADIUS, REPAIR_TIME } from './constants.js';
 import { canvas, ctx } from './main.js';
 
 export class Renderer {
@@ -163,7 +163,7 @@ export class Renderer {
       const by = CANVAS_HEIGHT - 48;
       ctx.fillStyle = '#333';
       ctx.fillRect(bx, by, barW, barH);
-      const maxProgress = player.health === PLAYER_HEALTH.HOOKED ? 100 : 180;
+      const maxProgress = player.health === PLAYER_HEALTH.HOOKED ? 100 : REPAIR_TIME;
       ctx.fillStyle = '#4ecdc4';
       ctx.fillRect(bx, by, barW * Math.min(1, player.interactProgress / maxProgress), barH);
       ctx.strokeStyle = '#fff';
