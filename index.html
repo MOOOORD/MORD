@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>非对称竞技</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="menu-screen" class="screen">
+  <h1 class="pixel-title">非对称竞技</h1>
+  <p class="pixel-subtitle">Asymmetric Survival</p>
+  <div id="menu-buttons"></div>
+</div>
+<div id="game-screen" class="screen hidden">
+  <canvas id="game-canvas"></canvas>
+  <div id="hud"></div>
+</div>
+<div id="result-screen" class="screen hidden">
+  <h2 id="result-title"></h2>
+  <p id="result-detail"></p>
+  <button id="btn-restart">再来一局</button>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
