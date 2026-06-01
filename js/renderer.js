@@ -27,8 +27,30 @@ export class Renderer {
 
     map.render(ctx, cx, cy);
     objectives.render(ctx, cx, cy, pulseFrame);
-    player.render(ctx, cx, cy);
-    killer.render(ctx, cx, cy);
+
+    // Player pixel sprite
+    const psx = player.x - cx;
+    const psy = player.y - cy;
+    if (player.health !== 'dead' && player.health !== 'hooked') {
+      if (!(player.invincibleTimer > 0 && Math.floor(player.invincibleTimer / 4) % 2 === 0)) {
+        const sprite = this._getPlayerSprite(player.health);
+        this._drawPixelChar(ctx, psx - 12, psy - 12, sprite, 3);
+      }
+    } else if (player.health === 'hooked') {
+      // Hooked player visual
+      ctx.fillStyle = '#ff6b6b';
+      ctx.fillRect(psx - 4, psy - 16, 8, 8);
+      ctx.fillStyle = '#e94560';
+      ctx.fillRect(psx - 6, psy - 18, 12, 4);
+    }
+
+    // Killer pixel sprite
+    const ksx = killer.x - cx;
+    const ksy = killer.y - cy;
+    if (killer.stunTimer <= 0 || Math.floor(killer.stunTimer / 8) % 2 === 0) {
+      const kSprite = this._getKillerSprite(killer.state);
+      this._drawPixelChar(ctx, ksx - 9, ksy - 9, kSprite, 3);
+    }
 
     this._renderHeartbeat(player, killer);
     this._renderPowerFlash(game);
@@ -168,5 +190,38 @@ export class Renderer {
     ctx.font = '14px "Press Start 2P", monospace';
     ctx.fillText('按 Esc 继续', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30);
     ctx.textAlign = 'start';
+  }
+
+  _drawPixelChar(ctx, x, y, data, scale = 3) {
+    for (const [px, py, color] of data) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x + px * scale, y + py * scale, scale, scale);
+    }
+  }
+
+  _getPlayerSprite(health) {
+    const body = health === 'injured' ? '#ff8a80' : '#4ecdc4';
+    const hair = '#2c2c2c';
+    return [
+      [1,0,hair],[2,0,hair],[3,0,hair],[4,0,hair],[5,0,hair],[6,0,hair],
+      [0,1,hair],[1,1,body],[2,1,body],[3,1,'#fff'],[4,1,'#fff'],[5,1,body],[6,1,body],[7,1,hair],
+      [0,2,body],[1,2,body],[2,2,body],[3,2,'#333'],[4,2,'#333'],[5,2,body],[6,2,body],[7,2,body],
+      [0,3,body],[1,3,body],[2,3,body],[3,3,body],[4,3,body],[5,3,body],[6,3,body],[7,3,body],
+      [0,4,'#333'],[1,4,body],[2,4,body],[3,4,body],[4,4,body],[5,4,body],[6,4,body],[7,4,'#333'],
+      [0,5,'#333'],[1,5,'#333'],[2,5,body],[3,5,body],[4,5,body],[5,5,body],[6,5,'#333'],[7,5,'#333'],
+      [0,6,hair],[1,6,'#333'],[2,6,'#333'],[3,6,'#333'],[4,6,'#333'],[5,6,'#333'],[6,6,'#333'],[7,6,hair],
+    ];
+  }
+
+  _getKillerSprite(state) {
+    const body = state === 'chase' ? '#4a0000' : '#1a1a1a';
+    return [
+      [0,0,body],[1,0,body],[2,0,'#e94560'],[3,0,'#e94560'],[4,0,body],[5,0,body],
+      [0,1,body],[1,1,'#e94560'],[2,1,body],[3,1,body],[4,1,'#e94560'],[5,1,body],
+      [0,2,body],[1,2,body],[2,2,body],[3,2,body],[4,2,body],[5,2,body],
+      [0,3,'#333'],[1,3,body],[2,3,body],[3,3,body],[4,3,body],[5,3,'#333'],
+      [0,4,'#333'],[1,4,'#333'],[2,4,body],[3,4,body],[4,4,'#333'],[5,4,'#333'],
+      [0,5,'#555'],[1,5,'#333'],[2,5,'#333'],[3,5,'#333'],[4,5,'#333'],[5,5,'#555'],
+    ];
   }
 }
