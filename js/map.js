@@ -1,5 +1,5 @@
 // map.js
-import { TILE, MAP_COLS, MAP_ROWS, MAP_TYPE, TILE_SIZE } from './constants.js';
+import { TILE, MAP_COLS, MAP_ROWS, MAP_TYPE, TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
 
 export class GameMap {
   constructor(type) {
@@ -221,6 +221,40 @@ export class GameMap {
       for (let c = 0; c < this.cols; c++) {
         if (this.grid[r][c] === TILE.WALL || this.grid[r][c] === TILE.OBSTACLE) {
           this.obstacles.push({ x: c, y: r, w: 1, h: 1 });
+        }
+      }
+    }
+  }
+
+  render(ctx, cameraX, cameraY) {
+    const startCol = Math.max(0, Math.floor(cameraX / TILE_SIZE));
+    const startRow = Math.max(0, Math.floor(cameraY / TILE_SIZE));
+    const endCol = Math.min(this.cols, startCol + Math.ceil(CANVAS_WIDTH / TILE_SIZE) + 1);
+    const endRow = Math.min(this.rows, startRow + Math.ceil(CANVAS_HEIGHT / TILE_SIZE) + 1);
+
+    for (let r = startRow; r < endRow; r++) {
+      for (let c = startCol; c < endCol; c++) {
+        const tile = this.grid[r][c];
+        const sx = c * TILE_SIZE - cameraX;
+        const sy = r * TILE_SIZE - cameraY;
+
+        switch (tile) {
+          case TILE.WALL:
+            ctx.fillStyle = '#16213e';
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            ctx.fillStyle = '#1a1a40';
+            ctx.fillRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+            break;
+          case TILE.OBSTACLE:
+            ctx.fillStyle = '#0f3460';
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            ctx.fillStyle = '#1a1a3e';
+            ctx.fillRect(sx + 1, sy + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+            break;
+          default:
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            break;
         }
       }
     }
