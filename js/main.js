@@ -24,8 +24,8 @@ function render() {
 }
 
 function gameLoop(timestamp) {
-  if (lastTime === 0) lastTime = timestamp;
-  const elapsed = timestamp - lastTime;
+  const elapsed = Math.min(timestamp - lastTime, 200); // cap to avoid spiral
+  if (lastTime === 0) { lastTime = timestamp; requestAnimationFrame(gameLoop); return; }
   lastTime = timestamp;
 
   if (gameState === STATE.PLAYING) {
