@@ -6,11 +6,67 @@ body { background: #0a0a0a; color: #e0e0e0; font-family: 'Press Start 2P', monos
 .screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .hidden { display: none !important; }
 
-.pixel-title { font-size: 36px; color: #e94560; text-shadow: 3px 3px 0 #000; margin-bottom: 12px; letter-spacing: 4px; }
-.pixel-subtitle { font-size: 12px; color: #888; margin-bottom: 48px; }
+/* --- Animated Title --- */
+.pixel-title {
+  font-size: 48px;
+  letter-spacing: 8px;
+  margin-bottom: 16px;
+  display: flex;
+  gap: 0;
+}
 
-.pixel-btn { font-family: 'Press Start 2P', monospace; font-size: 14px; padding: 16px 32px; margin: 8px; border: 3px solid #e94560; background: #1a1a2e; color: #e0e0e0; cursor: pointer; image-rendering: pixelated; }
-.pixel-btn:hover { background: #e94560; color: #fff; }
+.title-char {
+  display: inline-block;
+  color: #e94560;
+  text-shadow: 0 0 10px #e94560, 0 0 30px #e94560, 3px 3px 0 #000;
+  animation: titleFloat 2.5s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.2s);
+}
+
+/* Floating bounce — each char at different phase */
+@keyframes titleFloat {
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-12px); }
+  60% { transform: translateY(4px); }
+}
+
+/* Glow pulse on the whole title row */
+.pixel-title::after {
+  content: '';
+}
+
+/* Subtitle flicker */
+.pixel-subtitle {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 48px;
+  animation: subtitleFlicker 3s ease-in-out infinite;
+  letter-spacing: 2px;
+}
+
+@keyframes subtitleFlicker {
+  0%, 100% { opacity: 0.7; color: #888; }
+  50% { opacity: 1; color: #aaa; }
+}
+
+/* --- Buttons --- */
+.pixel-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  padding: 16px 32px;
+  margin: 8px;
+  border: 3px solid #e94560;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  cursor: pointer;
+  image-rendering: pixelated;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.pixel-btn:hover {
+  background: #e94560;
+  color: #fff;
+  box-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+}
 
 #game-canvas { display: block; image-rendering: pixelated; }
 
