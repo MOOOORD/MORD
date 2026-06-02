@@ -33,6 +33,7 @@ export class Killer {
     this._pathIndex = 0;
     this._pathTimer = 0;          // frames since last path compute
     this._useSmartPath = false;   // fallback to A* when stuck
+    this._pathLockTimer = 0;     // hysteresis: stay in current movement mode
     this.lastPlayerSeen = null;
     this.visitedGens = [];
     this.patrolPause = 0;
@@ -460,10 +461,16 @@ export class Killer {
     if (this.attackPhase === 'wipe') moveMult = 0.2;
     if (this.windowSlowTimer > 0) moveMult = Math.min(moveMult, 0.4);
 
-    // Use A* if walls block direct line to target (e.g. killer in room, target outside)
+    // Use A* if walls block direct line to target (e.g. killer in room, target outside).
+    // Hysteresis: once in pathfinding, stay at least 30f; once in direct, stay at least 20f.
     const blocked = !this._hasLineOfSight(this.x, this.y, target.x, target.y, gameMap);
+    if (blocked && this._pathLockTimer <= 0) {
+      this._pathLockTimer = 30;
+    } else if (!blocked && this._pathLockTimer > 0) {
+      this._pathLockTimer--;
+    }
     const needPath = this.state === KILLER_STATE.CHASE || this.state === KILLER_STATE.CARRY
-                     || this._useSmartPath || blocked;
+                     || this._useSmartPath || this._pathLockTimer > 15;
     if (needPath) {
       this._moveWithPathfinding(dt, target, gameMap, moveMult);
     } else {

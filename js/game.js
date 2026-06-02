@@ -1,5 +1,5 @@
 // game.js
-import { STATE, GAME_MODE, PLAYER_HEALTH, SCORE_MODE_TIME, KILLER_SPEED, KILLER_STATE, REPAIR_DECAY_RATE, REPAIR_DECAY_FAST, NETWORK_STATE_RATE, NETWORK_INPUT_RATE, PLAYER_ROLE } from './constants.js';
+import { STATE, GAME_MODE, PLAYER_HEALTH, SCORE_MODE_TIME, KILLER_SPEED, KILLER_STATE, NETWORK_STATE_RATE, NETWORK_INPUT_RATE, PLAYER_ROLE } from './constants.js';
 import { GameMap } from './map.js';
 import { Player } from './player.js';
 import { Killer } from './killer.js';
@@ -267,7 +267,6 @@ export class Game {
           }
         }
       } else {
-        this.player.interactProgress = Math.max(0, this.player.interactProgress - REPAIR_DECAY_FAST);
         this.player.interacting = false;
       }
     } else if (playerKeys['Space']) {
@@ -288,12 +287,10 @@ export class Game {
             }
           }
         } else {
-          this.player.interactProgress = Math.max(0, this.player.interactProgress - REPAIR_DECAY_FAST);
           this.player.interacting = false;
         }
       }
     } else {
-      this.player.interactProgress = Math.max(0, this.player.interactProgress - REPAIR_DECAY_RATE);
       this.player.interacting = false;
     }
 
