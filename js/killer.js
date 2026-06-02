@@ -32,6 +32,7 @@ export class Killer {
     this._pathKey = '';           // cache key for path target
     this._pathIndex = 0;
     this._pathTimer = 0;          // frames since last path compute
+    this._useSmartPath = false;   // fallback to A* when stuck
     this.lastPlayerSeen = null;
     this.visitedGens = [];
     this.patrolPause = 0;
@@ -68,16 +69,21 @@ export class Killer {
     this._updateState(player, gameMap);
     this._executeState(dt, player, gameMap);
 
-    // Stuck detection — if killer hasn't moved at all, try alternate route
+    // Stuck detection — escalate to smarter pathfinding when blocked
     const moved = Math.hypot(this.x - this.lastPos.x, this.y - this.lastPos.y);
     if (moved < 0.5) {
       this.stuckFrames++;
-      if (this.stuckFrames > 90) {
-        this._tryUnstuck(gameMap);
-        this.stuckFrames = 0;
+      if (this.stuckFrames === 30) {
+        // Stage 1: clear path and recompute with A*
+        this._clearPath();
+        this._useSmartPath = true;
+      } else if (this.stuckFrames >= 60 && this.stuckFrames % 15 === 0) {
+        // Stage 2: jitter position slightly to escape corners
+        this._nudgeOut(gameMap);
       }
     } else {
       this.stuckFrames = 0;
+      this._useSmartPath = false;
     }
     this.lastPos = { x: this.x, y: this.y };
 
@@ -195,16 +201,19 @@ export class Killer {
       }
     }
 
-    // Stuck detection
+    // Stuck detection — nudge out of corners
     const moved = Math.hypot(this.x - this.lastPos.x, this.y - this.lastPos.y);
     if (moved < 0.5) {
       this.stuckFrames++;
-      if (this.stuckFrames > 90) {
-        this._tryUnstuck(gameMap);
-        this.stuckFrames = 0;
+      if (this.stuckFrames === 30) {
+        this._clearPath();
+        this._useSmartPath = true;
+      } else if (this.stuckFrames >= 60 && this.stuckFrames % 15 === 0) {
+        this._nudgeOut(gameMap);
       }
     } else {
       this.stuckFrames = 0;
+      this._useSmartPath = false;
     }
     this.lastPos = { x: this.x, y: this.y };
 
@@ -451,7 +460,7 @@ export class Killer {
     if (this.attackPhase === 'wipe') moveMult = 0.2;
     if (this.windowSlowTimer > 0) moveMult = Math.min(moveMult, 0.4);
 
-    const needPath = this.state === KILLER_STATE.CHASE || this.state === KILLER_STATE.CARRY;
+    const needPath = this.state === KILLER_STATE.CHASE || this.state === KILLER_STATE.CARRY || this._useSmartPath;
     if (needPath) {
       this._moveWithPathfinding(dt, target, gameMap, moveMult);
     } else {
@@ -608,33 +617,23 @@ export class Killer {
     this._pathTimer = 0;
   }
 
-  _tryUnstuck(gameMap) {
-    const dirs = [
-      [1, 0], [-1, 0], [0, 1], [0, -1],
-      [1, 1], [-1, 1], [1, -1], [-1, -1],
+  _nudgeOut(gameMap) {
+    // Tiny step in a random direction to escape tight corners.
+    // Does NOT teleport — max displacement is 8px (~0.25 tiles).
+    const offsets = [
+      [8, 0], [-8, 0], [0, 8], [0, -8],
+      [6, 6], [-6, 6], [6, -6], [-6, -6],
     ];
-    for (let i = dirs.length - 1; i > 0; i--) {
+    for (let i = offsets.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+      [offsets[i], offsets[j]] = [offsets[j], offsets[i]];
     }
-    for (const [dr, dc] of dirs) {
-      const tx = this.x + dc * TILE_SIZE * 1.5;
-      const ty = this.y + dr * TILE_SIZE * 1.5;
+    for (const [dx, dy] of offsets) {
+      const tx = this.x + dx;
+      const ty = this.y + dy;
       if (gameMap.isWalkable(tx, ty, false)) {
         this.x = tx;
         this.y = ty;
-        this._clearPath();
-        return;
-      }
-    }
-    // Last resort: nudge to nearest walkable neighbor
-    for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const tx = this.x + dc * TILE_SIZE * 0.5;
-      const ty = this.y + dr * TILE_SIZE * 0.5;
-      if (gameMap.isWalkable(tx, ty, false)) {
-        this.x = tx;
-        this.y = ty;
-        this._clearPath();
         return;
       }
     }
