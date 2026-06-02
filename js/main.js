@@ -5,6 +5,7 @@ import { Renderer } from './renderer.js';
 import { MapEditor } from './editor.js';
 import { P2PClient } from './p2p.js';
 import { Lobby } from './lobby.js';
+import { DUN_BIRTH } from './maps.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -312,12 +313,17 @@ function buildMapSelect() {
     { type: MAP_TYPE.ROOMS, label: '房间走廊' },
     { type: MAP_TYPE.OPEN, label: '开阔场地' },
     { type: MAP_TYPE.HYBRID, label: '混合式' },
+    { type: MAP_TYPE.CUSTOM, label: '蹲出生天', mapData: DUN_BIRTH },
   ];
   for (const m of maps) {
     const btn = document.createElement('button');
     btn.className = 'pixel-btn';
     btn.textContent = m.label;
-    btn.onclick = () => { mapTypeSelection = m.type; startGame(); };
+    btn.onclick = () => {
+      mapTypeSelection = m.type;
+      customMapData = m.mapData || null;
+      startGame();
+    };
     menuButtons.appendChild(btn);
   }
 
