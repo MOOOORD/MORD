@@ -8,10 +8,6 @@ body { background: #0a0a0a; color: #e0e0e0; font-family: 'Press Start 2P', monos
 
 /* --- Quote Bar --- */
 #quote-bar {
-  position: fixed;
-  top: 24px;
-  left: 50%;
-  transform: translateX(-50%);
   font-family: 'Press Start 2P', monospace;
   font-size: 16px;
   color: #f0c040;
@@ -19,9 +15,16 @@ body { background: #0a0a0a; color: #e0e0e0; font-family: 'Press Start 2P', monos
   text-align: center;
   max-width: 90vw;
   line-height: 1.6;
-  z-index: 100;
+  margin-bottom: 20px;
+  cursor: pointer;
+  user-select: none;
   transition: opacity 0.5s;
   opacity: 0.9;
+  padding: 4px 0;
+}
+#quote-bar:hover {
+  opacity: 1;
+  text-shadow: 0 0 18px rgba(240, 192, 64, 0.8);
 }
 
 /* --- Animated Title --- */
