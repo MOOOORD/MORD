@@ -2,12 +2,14 @@
 import { LOBBY_STATE, PLAYER_ROLE } from './constants.js';
 
 export class Lobby {
-  constructor(network, onStartGame) {
+  constructor(network, onStartGame, getServerUrl, onServerUrlChange) {
     this.network = network;
     this.onStartGame = onStartGame;
+    this._getServerUrl = getServerUrl;
+    this._onServerUrlChange = onServerUrlChange;
     this.state = LOBBY_STATE.IDLE;
     this.roomCode = null;
-    this.selectedRole = null; // player's own role choice
+    this.selectedRole = null;
     this.peerJoined = false;
     this._codeDigits = ['', '', '', ''];
     this._digitInputs = [];
@@ -22,9 +24,46 @@ export class Lobby {
   _drawIdle() {
     this.state = LOBBY_STATE.IDLE;
     this._container.innerHTML = '';
-    this._statusEl.textContent = '';
-    this._statusEl.className = '';
+    this._setStatus('', '');
 
+    // Server URL config
+    const url = this._getServerUrl ? this._getServerUrl() : 'ws://localhost:3000';
+    const isDefault = url === 'ws://localhost:3000';
+
+    const serverRow = document.createElement('div');
+    serverRow.style.cssText = 'margin-bottom:16px;display:flex;align-items:center;gap:8px;justify-content:center';
+
+    const urlLabel = document.createElement('span');
+    urlLabel.style.cssText = 'font-size:12px;color:#888;';
+    urlLabel.textContent = '服务器:';
+
+    const urlInput = document.createElement('input');
+    urlInput.type = 'text';
+    urlInput.value = url;
+    urlInput.style.cssText =
+      'background:#111;border:1px solid #444;color:#ccc;padding:4px 8px;' +
+      'font-size:12px;font-family:monospace;width:200px;border-radius:2px;';
+    urlInput.addEventListener('change', () => {
+      const val = urlInput.value.trim();
+      if (val && val !== url && this._onServerUrlChange) {
+        this._onServerUrlChange(val);
+        this._setStatus('服务器地址已保存 ✓', 'connected');
+        setTimeout(() => {
+          if (this.state === LOBBY_STATE.IDLE) this._setStatus('', '');
+        }, 2000);
+      }
+    });
+
+    const hint = document.createElement('span');
+    hint.style.cssText = 'font-size:10px;color:#666;';
+    hint.textContent = isDefault ? '(需先启动 node server/index.js)' : '(已保存)';
+
+    serverRow.appendChild(urlLabel);
+    serverRow.appendChild(urlInput);
+    serverRow.appendChild(hint);
+    this._container.appendChild(serverRow);
+
+    // Buttons
     const row = document.createElement('div');
     row.className = 'lobby-row';
 
@@ -69,7 +108,7 @@ export class Lobby {
       setTimeout(() => {
         clearInterval(check);
         if (this.network.connectionState !== 'connected') {
-          this._setStatus('无法连接服务器，请检查网络', 'error');
+          this._setStatus('无法连接服务器，请检查地址', 'error');
         }
       }, 8000);
     } else {
@@ -135,7 +174,6 @@ export class Lobby {
     this._container.appendChild(btnCopy);
     this._container.appendChild(btnCancel);
 
-    // Listen for peer joining
     const onPeer = () => {
       this.peerJoined = true;
       this.network.off('peer_joined', onPeer);
@@ -143,7 +181,6 @@ export class Lobby {
     };
     this.network.on('peer_joined', onPeer);
 
-    // Handle disconnect while waiting
     const onDisconnect = () => {
       this.network.off('peer_disconnected', onDisconnect);
       this._setStatus('对手已断开连接', 'error');
@@ -271,7 +308,6 @@ export class Lobby {
     const cards = document.createElement('div');
     cards.className = 'role-cards';
 
-    // Survivor card
     const survCard = document.createElement('div');
     survCard.className = 'role-card survivor';
     survCard.innerHTML = `
@@ -286,7 +322,6 @@ export class Lobby {
       this._showReadyButton();
     });
 
-    // Killer card
     const killCard = document.createElement('div');
     killCard.className = 'role-card killer';
     killCard.innerHTML = `
@@ -305,13 +340,11 @@ export class Lobby {
     cards.appendChild(killCard);
     this._container.appendChild(cards);
 
-    // Store reference for start button
     this._roleCards = { survCard, killCard };
     this._startBtn = null;
   }
 
   _showReadyButton() {
-    // Remove existing start button if any
     if (this._startBtn) this._startBtn.remove();
 
     const btnStart = document.createElement('button');

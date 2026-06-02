@@ -12,7 +12,10 @@ canvas.width = CANVAS_WIDTH;
 canvas.height = CANVAS_HEIGHT;
 
 const params = new URLSearchParams(window.location.search);
-const SERVER_URL = params.get('server') || 'ws://localhost:3000';
+const urlParam = params.get('server');
+const STORAGE_KEY = 'foe_server_url';
+let serverUrl = urlParam || localStorage.getItem(STORAGE_KEY) || 'ws://localhost:3000';
+if (urlParam) localStorage.setItem(STORAGE_KEY, urlParam);
 
 const FIXED_DT = 1000 / 60;
 let game = new Game();
@@ -362,12 +365,20 @@ function initEditor() {
 
 function initLobby() {
   if (!network) {
-    network = new NetworkClient(SERVER_URL);
+    network = new NetworkClient(serverUrl);
     network.connect();
   }
   if (!lobby) {
     lobby = new Lobby(network, (isHost, role) => {
       startMultiplayerGame(isHost, role);
+    }, () => serverUrl, (newUrl) => {
+      serverUrl = newUrl;
+      localStorage.setItem(STORAGE_KEY, newUrl);
+      network.disconnect();
+      network = new NetworkClient(serverUrl);
+      network.connect();
+      // Re-attach lobby to new network
+      lobby.network = network;
     });
   }
   lobby.render(

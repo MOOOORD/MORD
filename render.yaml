@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: foe-relay
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: node start-server.js
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
