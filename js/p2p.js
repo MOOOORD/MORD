@@ -7,8 +7,6 @@ export class P2PClient {
     this.dc = null;
     this.handlers = new Map();
     this._state = 'disconnected';
-    this._offer = null;
-    this._pendingCandidates = [];
   }
 
   get connectionState() { return this._state; }
@@ -23,8 +21,11 @@ export class P2PClient {
     const offer = await this.pc.createOffer();
     await this.pc.setLocalDescription(offer);
 
-    // Wait for ICE candidates to collect
     await this._waitForIceComplete();
+
+    if (this._iceFailed) {
+      throw new Error('网络连接失败，请检查防火墙设置');
+    }
 
     this._state = 'signaling';
     return btoa(JSON.stringify(this.pc.localDescription));
@@ -38,38 +39,73 @@ export class P2PClient {
       this._setupDataChannel();
     };
 
-    const desc = JSON.parse(atob(offerB64));
-    await this.pc.setRemoteDescription(new RTCSessionDescription(desc));
+    let desc;
+    try {
+      desc = JSON.parse(atob(offerB64));
+    } catch {
+      throw new Error('连接码格式无效，请检查是否完整复制');
+    }
 
+    await this.pc.setRemoteDescription(new RTCSessionDescription(desc));
     const answer = await this.pc.createAnswer();
     await this.pc.setLocalDescription(answer);
 
     await this._waitForIceComplete();
+
+    if (this._iceFailed) {
+      throw new Error('网络连接失败，请检查防火墙设置');
+    }
 
     this._state = 'signaling';
     return btoa(JSON.stringify(this.pc.localDescription));
   }
 
   async setAnswer(answerB64) {
-    const desc = JSON.parse(atob(answerB64));
+    let desc;
+    try {
+      desc = JSON.parse(atob(answerB64));
+    } catch {
+      throw new Error('回应码格式无效，请检查是否完整复制');
+    }
     await this.pc.setRemoteDescription(new RTCSessionDescription(desc));
-    // Connection will complete when dc opens
   }
 
   _makePC() {
+    this._iceFailed = false;
     this.pc = new RTCPeerConnection({
       iceServers: [
+        { urls: 'stun:stun.miwifi.com:3478' },
+        { urls: 'stun:stun.qq.com:3478' },
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun.syncthing.net:3478' },
       ],
+      iceCandidatePoolSize: 2,
     });
 
     this.pc.oniceconnectionstatechange = () => {
-      if (this.pc.iceConnectionState === 'disconnected' ||
-          this.pc.iceConnectionState === 'failed') {
-        if (this._state === 'connected') {
+      const s = this.pc.iceConnectionState;
+      if (s === 'failed' || s === 'disconnected') {
+        if (this._state === 'signaling') {
+          this._iceFailed = true;
           this._state = 'disconnected';
           this._emit('peer_disconnected', {});
+        } else if (this._state === 'connected') {
+          this._state = 'disconnected';
+          this._emit('peer_disconnected', {});
+        }
+      }
+    };
+
+    this.pc.onicegatheringstatechange = () => {
+      if (this.pc.iceGatheringState === 'complete') {
+        // Check if we got any candidates
+        const localDesc = this.pc.localDescription;
+        if (localDesc && localDesc.sdp) {
+          const hasCand = localDesc.sdp.includes('a=candidate');
+          if (!hasCand) {
+            this._iceFailed = true;
+          }
         }
       }
     };
@@ -78,12 +114,17 @@ export class P2PClient {
   _setupDataChannel() {
     this.dc.onopen = () => {
       this._state = 'connected';
+      // Quick connectivity check — send a ping
+      this.send('ping', {});
       this._emit('*', { type: 'connected' });
     };
 
     this.dc.onmessage = (e) => {
       let msg;
       try { msg = JSON.parse(e.data); } catch { return; }
+      if (msg.type === 'ping') {
+        this.send('pong', {});
+      }
       this._emit(msg.type, msg);
       this._emit('*', msg);
     };
@@ -92,30 +133,42 @@ export class P2PClient {
       this._state = 'disconnected';
       this._emit('peer_disconnected', {});
     };
+
+    this.dc.onerror = () => {
+      // onclose will fire after this
+    };
   }
 
   _waitForIceComplete() {
     return new Promise((resolve) => {
       if (this.pc.iceGatheringState === 'complete') {
-        // Tiny delay to collect final candidates
         setTimeout(resolve, 200);
         return;
       }
+      if (this._iceFailed) { resolve(); return; }
+
       const check = setInterval(() => {
-        if (this.pc.iceGatheringState === 'complete') {
+        if (this.pc.iceGatheringState === 'complete' || this._iceFailed) {
           clearInterval(check);
           setTimeout(resolve, 200);
         }
       }, 100);
-      // Safety timeout
-      setTimeout(() => { clearInterval(check); resolve(); }, 3000);
+
+      setTimeout(() => {
+        clearInterval(check);
+        // If still gathering after timeout, check for candidates
+        const ld = this.pc.localDescription;
+        if (ld && ld.sdp && !ld.sdp.includes('a=candidate')) {
+          this._iceFailed = true;
+        }
+        resolve();
+      }, 5000);
     });
   }
 
   // ---- Same interface as NetworkClient ----
 
   connect() {
-    // P2P: connection is established via createOffer/acceptOffer/setAnswer
     if (this._state === 'connected') return;
   }
 

@@ -70,7 +70,7 @@ export class Lobby {
     try {
       offer = await this.p2p.createOffer();
     } catch (e) {
-      this._setStatus('生成连接失败，请刷新重试', 'error');
+      this._setStatus(e.message || '生成连接失败，请刷新重试', 'error');
       return;
     }
 
@@ -133,8 +133,10 @@ export class Lobby {
         await this._waitForConnect();
         this._drawRoleSelect();
       } catch (e) {
-        this._setStatus('连接失败，请让朋友重新生成回应码', 'error');
+        this._setStatus(e.message || '连接失败，请让朋友重新生成回应码', 'error');
       }
+      btnConfirm.disabled = false;
+      btnConfirm.textContent = '✓ 确认连接';
     };
 
     const btnCancel = document.createElement('button');
@@ -183,7 +185,7 @@ export class Lobby {
         this._answer = answer;
         this._drawGuestAnswer();
       } catch (e) {
-        this._setStatus('连接码无效，请检查是否完整复制', 'error');
+        this._setStatus(e.message || '连接码无效，请检查是否完整复制', 'error');
       }
     };
 
