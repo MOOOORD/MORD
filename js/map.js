@@ -12,6 +12,7 @@ export class GameMap {
     this.hooks = [];         // [{x, y}]
     this.pallets = [];       // [{x, y, dropped, broken}]
     this.obstacles = [];     // [{x, y, w, h}] for collision
+    this._rooms = [];        // [{x, y, w, h}] for window placement
 
     if (data !== null) {
       this._loadFromData(data);
@@ -53,24 +54,28 @@ export class GameMap {
   }
 
   _genRooms() {
-    const rooms = [
+    const defs = [
       { x: 2, y: 2, w: 8, h: 6 },
       { x: 20, y: 2, w: 8, h: 6 },
       { x: 2, y: 14, w: 8, h: 6 },
       { x: 20, y: 14, w: 8, h: 6 },
       { x: 12, y: 8, w: 6, h: 6 },
     ];
-    for (const r of rooms) {
+    this._rooms = defs.map(r => ({ ...r }));
+    for (const r of defs) {
       this._carveRoom(r.x, r.y, r.w, r.h);
     }
-    // Corridors connecting rooms — 1 tile wide to create chokepoints
+    // Horizontal corridors (1 wide)
     this._carveCorridor(9, 4, 20, 4, 1);
     this._carveCorridor(9, 16, 20, 16, 1);
+    // Vertical corridors (1 wide)
     this._carveCorridor(5, 7, 5, 14, 1);
     this._carveCorridor(24, 7, 24, 14, 1);
-    // Connect center room — carve 1-wide openings through its walls
-    this.grid[11][12] = TILE.FLOOR; // left wall
-    this.grid[11][17] = TILE.FLOOR; // right wall
+    // Connect center room — 2 corridor openings
+    this.grid[11][12] = TILE.FLOOR;
+    this.grid[11][17] = TILE.FLOOR;
+    // Re-carve walls around corridor openings to keep rooms enclosed
+    this._rebuildRoomWalls();
   }
 
   _genOpen() {
@@ -93,13 +98,14 @@ export class GameMap {
   }
 
   _genHybrid() {
-    const rooms = [
+    const defs = [
       { x: 2, y: 2, w: 7, h: 5 },
       { x: 21, y: 2, w: 7, h: 5 },
       { x: 2, y: 15, w: 7, h: 5 },
       { x: 21, y: 15, w: 7, h: 5 },
     ];
-    for (const r of rooms) {
+    this._rooms = defs.map(r => ({ ...r }));
+    for (const r of defs) {
       this._carveRoom(r.x, r.y, r.w, r.h);
     }
     const obstacles = [
@@ -115,19 +121,20 @@ export class GameMap {
         }
       }
     }
-    // Door openings in room walls — 1-wide chokepoints
-    // Top-left room (2,2,7,5): right wall x=8, bottom wall y=6
+    // Door openings — 2 per room (1-wide chokepoints)
+    // Top-left
     this.grid[4][8] = TILE.FLOOR;
     this.grid[6][4] = TILE.FLOOR;
-    // Top-right room (21,2,7,5): left wall x=21, bottom wall y=6
+    // Top-right
     this.grid[4][21] = TILE.FLOOR;
     this.grid[6][24] = TILE.FLOOR;
-    // Bottom-left room (2,15,7,5): right wall x=8, top wall y=15
+    // Bottom-left
     this.grid[17][8] = TILE.FLOOR;
     this.grid[15][4] = TILE.FLOOR;
-    // Bottom-right room (21,15,7,5): left wall x=21, top wall y=15
+    // Bottom-right
     this.grid[17][21] = TILE.FLOOR;
     this.grid[15][24] = TILE.FLOOR;
+    this._rebuildRoomWalls();
   }
 
   _carveRoom(x, y, w, h) {
@@ -144,6 +151,26 @@ export class GameMap {
     for (let c = x; c < x + w; c++) {
       this.grid[y][c] = TILE.WALL;
       this.grid[y + h - 1][c] = TILE.WALL;
+    }
+  }
+
+  _rebuildRoomWalls() {
+    // Re-apply walls around room perimeters, but don't overwrite
+    // floor tiles that are corridor openings or windows.
+    for (const r of this._rooms) {
+      const rx = r.x, ry = r.y, rw = r.w, rh = r.h;
+      for (let c = rx; c < rx + rw; c++) {
+        if (this.grid[ry][c] !== TILE.FLOOR && this.grid[ry][c] !== TILE.WINDOW)
+          this.grid[ry][c] = TILE.WALL;
+        if (this.grid[ry + rh - 1][c] !== TILE.FLOOR && this.grid[ry + rh - 1][c] !== TILE.WINDOW)
+          this.grid[ry + rh - 1][c] = TILE.WALL;
+      }
+      for (let rr = ry; rr < ry + rh; rr++) {
+        if (this.grid[rr][rx] !== TILE.FLOOR && this.grid[rr][rx] !== TILE.WINDOW)
+          this.grid[rr][rx] = TILE.WALL;
+        if (this.grid[rr][rx + rw - 1] !== TILE.FLOOR && this.grid[rr][rx + rw - 1] !== TILE.WINDOW)
+          this.grid[rr][rx + rw - 1] = TILE.WALL;
+      }
     }
   }
 
@@ -227,6 +254,50 @@ export class GameMap {
   }
 
   _placeWindows() {
+    if (this._rooms.length === 0) {
+      // No rooms defined — fallback to global random placement
+      this._placeWindowsGlobal();
+      return;
+    }
+    for (const room of this._rooms) {
+      this._placeWindowsForRoom(room);
+    }
+  }
+
+  _placeWindowsForRoom(room) {
+    const { x, y, w, h } = room;
+    const candidates = [];
+    // Collect wall tiles that have floor on both perpendicular sides
+    const isFloor = t => t === TILE.FLOOR || t === TILE.GENERATOR || t === TILE.PALLET;
+    // Top & bottom walls
+    for (let c = x + 1; c < x + w - 1; c++) {
+      if (this.grid[y][c] === TILE.WALL && isFloor(this.grid[y - 1][c]) && isFloor(this.grid[y + 1][c])) {
+        candidates.push({ r: y, c });
+      }
+      if (this.grid[y + h - 1][c] === TILE.WALL && isFloor(this.grid[y + h - 2][c]) && isFloor(this.grid[y + h][c])) {
+        candidates.push({ r: y + h - 1, c });
+      }
+    }
+    // Left & right walls
+    for (let r = y + 1; r < y + h - 1; r++) {
+      if (this.grid[r][x] === TILE.WALL && isFloor(this.grid[r][x - 1]) && isFloor(this.grid[r][x + 1])) {
+        candidates.push({ r, c: x });
+      }
+      if (this.grid[r][x + w - 1] === TILE.WALL && isFloor(this.grid[r][x + w - 2]) && isFloor(this.grid[r][x + w])) {
+        candidates.push({ r, c: x + w - 1 });
+      }
+    }
+    if (candidates.length === 0) return;
+    this._shuffle(candidates);
+    // 1–2 windows per room, ~20% of rooms get 3
+    let count = Math.random() < 0.2 ? 3 : 1 + Math.floor(Math.random() * 2);
+    count = Math.min(count, candidates.length);
+    for (let i = 0; i < count; i++) {
+      this.grid[candidates[i].r][candidates[i].c] = TILE.WINDOW;
+    }
+  }
+
+  _placeWindowsGlobal() {
     const candidates = [];
     for (let r = 1; r < this.rows - 1; r++) {
       for (let c = 1; c < this.cols - 1; c++) {
