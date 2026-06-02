@@ -303,7 +303,7 @@ export class Game {
     }
 
     // Killer update: AI or human-controlled
-    if (this.isMultiplayer && this.localRole === PLAYER_ROLE.SURVIVOR) {
+    if (this.isMultiplayer) {
       this.killer.updatePlayerControlled(dt, killerKeys, this.player, this.map);
     } else {
       this.killer.update(dt, this.player, this.map);
