@@ -202,22 +202,6 @@ export class Killer {
       }
     }
 
-    // Stuck detection — nudge out of corners
-    const moved = Math.hypot(this.x - this.lastPos.x, this.y - this.lastPos.y);
-    if (moved < 0.5) {
-      this.stuckFrames++;
-      if (this.stuckFrames === 30) {
-        this._clearPath();
-        this._useSmartPath = true;
-      } else if (this.stuckFrames >= 60 && this.stuckFrames % 15 === 0) {
-        this._nudgeOut(gameMap);
-      }
-    } else {
-      this.stuckFrames = 0;
-      this._useSmartPath = false;
-    }
-    this.lastPos = { x: this.x, y: this.y };
-
     if (this.windowSlowTimer > 0) this.windowSlowTimer--;
     const curTile = gameMap.getTile(this.x, this.y);
     if (curTile === TILE.WINDOW && this._lastTile !== TILE.WINDOW) {

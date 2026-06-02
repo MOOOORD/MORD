@@ -70,11 +70,14 @@
     </div>
     <div class="tutorial-section">
       <h3>—— 联机对战 ——</h3>
-      <p class="tutorial-text">主菜单点击<b>"双人对战"</b>进入联机大厅，两台设备<b>P2P 直连</b>，无需服务器。</p>
-      <p class="tutorial-text" style="margin-top:8px"><b>创建房间</b> → 复制连接码发给朋友 → 朋友回应后选择角色 → 开始游戏。</p>
-      <p class="tutorial-text"><b>加入房间</b> → 粘贴朋友的连接码 → 复制回应码发回 → 等待房主开始。</p>
-      <p class="tutorial-text" style="margin-top:8px"><b>逃生者：</b>WASD 移动 / Shift 奔跑 / E 修电机 / Space 翻窗砸板</p>
-      <p class="tutorial-text"><b>监管者：</b>WASD 移动 / Space 攻击 / E 抱起逃生者或砸碎板子</p>
+      <p class="tutorial-text">主菜单点击<b>"双人对战"</b>进入联机大厅，可选择<b>P2P 直连</b>或<b>服务器中继</b>两种方式。</p>
+      <p class="tutorial-text" style="margin-top:8px"><b>服务器中继（推荐）：</b>房主先运行 <code>npm run server:tunnel</code>，双方输入服务器地址后，用4位房间码加入。</p>
+      <p class="tutorial-text"><b>P2P 直连：</b>无需服务器，通过复制粘贴连接码即可建立直连。</p>
+      <p class="tutorial-text" style="margin-top:8px;color:#4ecdc4"><b>逃生者（陈飞飞）：</b></p>
+      <p class="tutorial-text">WASD 移动 &nbsp;|&nbsp; Shift 奔跑 &nbsp;|&nbsp; E 修理发电机/开大门 &nbsp;|&nbsp; Space 翻窗/砸板</p>
+      <p class="tutorial-text" style="margin-top:8px;color:#e94560"><b>监管者（阴沟）：</b></p>
+      <p class="tutorial-text">WASD 移动 &nbsp;|&nbsp; Space 攻击 &nbsp;|&nbsp; E 抱起倒地逃生者/砸碎已放下的板子</p>
+      <p class="tutorial-text" style="margin-top:4px;font-size:11px;color:#888">监管者移速比逃生者略快，但翻窗更慢。攻击前有短暂抬手动作，把握好距离。</p>
     </div>
     <button class="pixel-btn" id="btn-tutorial-back">← 返回</button>
   </div>
