@@ -24,6 +24,8 @@ export class Killer {
     this.breakTimer = 0;          // pallet break animation countdown
     this.breakTarget = null;      // pallet being broken
     this.preBreakState = null;    // state to resume after breaking pallet
+    this.stuckFrames = 0;         // frames spent stuck in same spot
+    this.lastPos = { x, y };      // last recorded position
     this.windowSlowTimer = 0;     // slowdown frames after vaulting a window
     this._lastTile = -1;
     this._path = null;            // A* path waypoints
@@ -65,6 +67,19 @@ export class Killer {
     this._updateAttack(player, gameMap);
     this._updateState(player, gameMap);
     this._executeState(dt, player, gameMap);
+
+    // Stuck detection — if killer hasn't moved significantly, try alternate route
+    const moved = Math.hypot(this.x - this.lastPos.x, this.y - this.lastPos.y);
+    if (moved < 8) {
+      this.stuckFrames++;
+      if (this.stuckFrames > 90) {
+        this._tryUnstuck(gameMap);
+        this.stuckFrames = 0;
+      }
+    } else {
+      this.stuckFrames = 0;
+    }
+    this.lastPos = { x: this.x, y: this.y };
 
     if (this.windowSlowTimer > 0) this.windowSlowTimer--;
     const curTile = gameMap.getTile(this.x, this.y);
@@ -464,6 +479,38 @@ export class Killer {
     this._pathKey = '';
     this._pathIndex = 0;
     this._pathTimer = 0;
+  }
+
+  _tryUnstuck(gameMap) {
+    const dirs = [
+      [1, 0], [-1, 0], [0, 1], [0, -1],
+      [1, 1], [-1, 1], [1, -1], [-1, -1],
+    ];
+    for (let i = dirs.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+    }
+    for (const [dr, dc] of dirs) {
+      const tx = this.x + dc * TILE_SIZE * 1.5;
+      const ty = this.y + dr * TILE_SIZE * 1.5;
+      if (gameMap.isWalkable(tx, ty, false)) {
+        this.x = tx;
+        this.y = ty;
+        this._clearPath();
+        return;
+      }
+    }
+    // Last resort: nudge to nearest walkable neighbor
+    for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const tx = this.x + dc * TILE_SIZE * 0.5;
+      const ty = this.y + dr * TILE_SIZE * 0.5;
+      if (gameMap.isWalkable(tx, ty, false)) {
+        this.x = tx;
+        this.y = ty;
+        this._clearPath();
+        return;
+      }
+    }
   }
 
   _attack(player) {
