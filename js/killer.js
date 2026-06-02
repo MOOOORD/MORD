@@ -460,7 +460,10 @@ export class Killer {
     if (this.attackPhase === 'wipe') moveMult = 0.2;
     if (this.windowSlowTimer > 0) moveMult = Math.min(moveMult, 0.4);
 
-    const needPath = this.state === KILLER_STATE.CHASE || this.state === KILLER_STATE.CARRY || this._useSmartPath;
+    // Use A* if walls block direct line to target (e.g. killer in room, target outside)
+    const blocked = !this._hasLineOfSight(this.x, this.y, target.x, target.y, gameMap);
+    const needPath = this.state === KILLER_STATE.CHASE || this.state === KILLER_STATE.CARRY
+                     || this._useSmartPath || blocked;
     if (needPath) {
       this._moveWithPathfinding(dt, target, gameMap, moveMult);
     } else {
@@ -657,6 +660,19 @@ export class Killer {
       const cy = this.y + dy * t;
       const tile = gameMap.getTile(cx, cy);
       if (tile === 1 || tile === 2) return false;
+    }
+    return true;
+  }
+
+  _hasLineOfSight(x1, y1, x2, y2, gameMap) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const steps = Math.ceil(dist / (TILE_SIZE / 2));
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const tile = gameMap.getTile(x1 + dx * t, y1 + dy * t);
+      if (tile === TILE.WALL || tile === TILE.OBSTACLE) return false;
     }
     return true;
   }
