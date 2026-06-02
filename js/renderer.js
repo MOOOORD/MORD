@@ -1,5 +1,5 @@
 // renderer.js
-import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_HEALTH, GAME_MODE, STATE, PLAYER_VISION_RADIUS, KILLER_VISION_RADIUS, REPAIR_TIME } from './constants.js';
+import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_HEALTH, GAME_MODE, STATE, PLAYER_VISION_RADIUS, KILLER_VISION_RADIUS, REPAIR_TIME, PLAYER_ROLE } from './constants.js';
 import { canvas, ctx } from './main.js';
 
 export class Renderer {
@@ -231,7 +231,8 @@ export class Renderer {
       ctx.textAlign = 'start';
     }
 
-    if (player.health === PLAYER_HEALTH.HOOKED) {
+    // Hook struggle bar — only shown to survivor, not killer
+    if (player.health === PLAYER_HEALTH.HOOKED && !(game.isMultiplayer && game.localRole === PLAYER_ROLE.KILLER)) {
       ctx.font = '26px "Press Start 2P", monospace';
       ctx.fillStyle = '#e94560';
       ctx.textAlign = 'center';

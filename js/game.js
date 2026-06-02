@@ -315,14 +315,7 @@ export class Game {
 
     // Killer update: AI or human-controlled
     if (this.isMultiplayer) {
-      // Check if remote player is actually sending input
-      const hasRemoteInput = Object.entries(killerKeys).some(([k, v]) => v === true);
-      if (hasRemoteInput || this.localRole === PLAYER_ROLE.KILLER) {
-        this.killer.updatePlayerControlled(dt, killerKeys, this.player, this.map);
-      } else {
-        // No remote input — fall back to AI (for solo testing)
-        this.killer.update(dt, this.player, this.map);
-      }
+      this.killer.updatePlayerControlled(dt, killerKeys, this.player, this.map);
     } else {
       this.killer.update(dt, this.player, this.map);
     }
