@@ -3,19 +3,13 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT, STATE, GAME_MODE, MAP_TYPE, PLAYER_ROLE } 
 import { Game } from './game.js';
 import { Renderer } from './renderer.js';
 import { MapEditor } from './editor.js';
-import { NetworkClient } from './network.js';
+import { P2PClient } from './p2p.js';
 import { Lobby } from './lobby.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 canvas.width = CANVAS_WIDTH;
 canvas.height = CANVAS_HEIGHT;
-
-const params = new URLSearchParams(window.location.search);
-const urlParam = params.get('server');
-const STORAGE_KEY = 'foe_server_url';
-let serverUrl = urlParam || localStorage.getItem(STORAGE_KEY) || 'ws://localhost:3000';
-if (urlParam) localStorage.setItem(STORAGE_KEY, urlParam);
 
 const FIXED_DT = 1000 / 60;
 let game = new Game();
@@ -31,6 +25,7 @@ let editor = null;
 let network = null;
 let lobby = null;
 let isMultiplayerGame = false;
+let pendingGameStart = null; // client: stored game_start data from lobby
 
 const QUOTES = [
   '这喷不了这是真处！',
@@ -365,20 +360,17 @@ function initEditor() {
 
 function initLobby() {
   if (!network) {
-    network = new NetworkClient(serverUrl);
-    network.connect();
+    network = new P2PClient();
   }
   if (!lobby) {
-    lobby = new Lobby(network, (isHost, role) => {
-      startMultiplayerGame(isHost, role);
-    }, () => serverUrl, (newUrl) => {
-      serverUrl = newUrl;
-      localStorage.setItem(STORAGE_KEY, newUrl);
-      network.disconnect();
-      network = new NetworkClient(serverUrl);
-      network.connect();
-      // Re-attach lobby to new network
-      lobby.network = network;
+    lobby = new Lobby(network, (isHost, role, gameData) => {
+      if (isHost) {
+        startMultiplayerGame(true, role);
+      } else {
+        // Client: lobby already received game_start, pass data directly
+        pendingGameStart = gameData;
+        startMultiplayerGame(false, role);
+      }
     });
   }
   lobby.render(
@@ -399,30 +391,25 @@ function startMultiplayerGame(isHost, role) {
       game.init(mapTypeSelection, gameModeSelection);
     }
     game.initMultiplayer(mapTypeSelection, gameModeSelection, mapData, role || PLAYER_ROLE.SURVIVOR, true, network);
-    // Send game start with map data to client
     const mapJson = game.map.toJSON();
     network.send('game_event', { event: 'game_start', mapType: mapTypeSelection, mode: gameModeSelection, mapData: mapJson, hostRole: role });
     showScreen('game-screen');
     lastTime = 0;
     accumulator = 0;
     resultShown = false;
-  } else {
-    // Client waits for game_start from host
-    network.on('game_event', function onGameStart(msg) {
-      if (msg.event === 'game_start') {
-        network.off('game_event', onGameStart);
-        const mData = msg.mapData ? JSON.parse(msg.mapData) : null;
-        const mType = msg.mapType || MAP_TYPE.HYBRID;
-        const mode = msg.mode || GAME_MODE.ESCAPE;
-        const clientRole = msg.hostRole === PLAYER_ROLE.SURVIVOR ? PLAYER_ROLE.KILLER : PLAYER_ROLE.SURVIVOR;
-        game.init(mType, mode, mData);
-        game.initMultiplayer(mType, mode, mData, clientRole, false, network);
-        showScreen('game-screen');
-        lastTime = 0;
-        accumulator = 0;
-        resultShown = false;
-      }
-    });
+  } else if (pendingGameStart) {
+    // Client: use data from lobby (already received via P2P data channel)
+    const msg = pendingGameStart;
+    pendingGameStart = null;
+    const mData = msg.mapData ? JSON.parse(msg.mapData) : null;
+    const mType = msg.mapType || MAP_TYPE.HYBRID;
+    const mode = msg.mode || GAME_MODE.ESCAPE;
+    game.init(mType, mode, mData);
+    game.initMultiplayer(mType, mode, mData, role, false, network);
+    showScreen('game-screen');
+    lastTime = 0;
+    accumulator = 0;
+    resultShown = false;
   }
 }
 
