@@ -224,13 +224,21 @@ export class Game {
     // --- Client: send input every frame, no local prediction ---
     if (this.isMultiplayer && !this.isHost) {
       this._sendInput();
-      if (this.pulseFrame === 0) console.log('[CLIENT] sending input, waiting for state_sync');
+      if (this.pulseFrame === 0) {
+        const msg = '[CLIENT] sending input, waiting for state_sync';
+        console.log(msg);
+        if (typeof window._debug === 'function') window._debug(msg);
+      }
       this.pulseFrame++;
       return;
     }
 
     // --- Host / single-player: full simulation ---
-    if (this.pulseFrame === 0) console.log('[HOST] running full simulation, isMultiplayer=', this.isMultiplayer, 'localRole=', this.localRole, 'isHost=', this.isHost, 'playerKeys=', Object.keys(this.keys).filter(k => this.keys[k]));
+    if (this.pulseFrame === 0) {
+      const msg = '[HOST] running sim role=' + this.localRole;
+      console.log(msg);
+      if (typeof window._debug === 'function') window._debug(msg);
+    }
     this.pulseFrame++;
     this.survivalTime += dt;
     if (this.powerFlash > 0) this.powerFlash--;
@@ -400,7 +408,11 @@ export class Game {
   }
 
   handleKeyDown(code) {
-    if (this.keys[code] !== true) console.log('[KEY] down:', code, 'state=', this.state, 'isMulti=', this.isMultiplayer, 'isHost=', this.isHost);
+    if (this.keys[code] !== true) {
+      const msg = '[KEY] ' + code;
+      console.log(msg);
+      if (typeof window._debug === 'function') window._debug(msg);
+    }
     this.keys[code] = true;
   }
 
