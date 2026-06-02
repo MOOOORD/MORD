@@ -115,22 +115,24 @@ export class Game {
     const s = data;
     if (!s || !s.p || !s.k) return;
 
-    // Player state
-    this.player.x = s.p[0];
-    this.player.y = s.p[1];
+    const lerp = 0.35; // smooth interpolation factor
+
+    // Player state (lerp position to avoid snapping)
+    this.player.x += (s.p[0] - this.player.x) * lerp;
+    this.player.y += (s.p[1] - this.player.y) * lerp;
     this.player.health = HEALTH_MAP[s.p[2]] || PLAYER_HEALTH.HEALTHY;
-    this.player.stamina = s.p[3];
+    this.player.stamina += (s.p[3] - this.player.stamina) * lerp;
     this.player.hookCount = s.p[4];
     this.player.hookTimer = s.p[5];
     this.player.invincibleTimer = s.p[6];
     this.player.hitBoostTimer = s.p[7];
     this.player.facingDir = { x: s.p[8], y: s.p[9] };
     this.player.interacting = !!s.p[10];
-    this.player.interactProgress = s.p[11];
+    this.player.interactProgress += (s.p[11] - this.player.interactProgress) * lerp;
 
-    // Killer state
-    this.killer.x = s.k[0];
-    this.killer.y = s.k[1];
+    // Killer state (lerp position)
+    this.killer.x += (s.k[0] - this.killer.x) * lerp;
+    this.killer.y += (s.k[1] - this.killer.y) * lerp;
     this.killer.state = KSTATE_MAP[s.k[2]] || KILLER_STATE.PATROL;
     this.killer.stunTimer = s.k[3];
     this.killer.attackPhase = APHASE_MAP[s.k[4]] || 'idle';
@@ -211,21 +213,9 @@ export class Game {
   update(dt) {
     if (this.state !== STATE.PLAYING) return;
 
-    // --- Client: send input, apply local prediction, no simulation ---
+    // --- Client: send input every frame, no local prediction ---
     if (this.isMultiplayer && !this.isHost) {
-      this.lastStateSend += dt * 1000;
-      if (this.lastStateSend >= NETWORK_INPUT_RATE) {
-        this._sendInput();
-        // Reset accumulated time (keep remainder)
-        while (this.lastStateSend >= NETWORK_INPUT_RATE) this.lastStateSend -= NETWORK_INPUT_RATE;
-      }
-      // Local input prediction: move own character based on keys
-      const myEntity = this.localRole === PLAYER_ROLE.SURVIVOR ? this.player : this.killer;
-      if (myEntity === this.player) {
-        myEntity.update(dt, this.keys, this.map);
-      } else {
-        this.killer.updatePlayerControlled(dt, this.keys, this.player, this.map);
-      }
+      this._sendInput();
       return;
     }
 
