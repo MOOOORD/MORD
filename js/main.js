@@ -2,6 +2,7 @@
 import { CANVAS_WIDTH, CANVAS_HEIGHT, STATE, GAME_MODE, MAP_TYPE } from './constants.js';
 import { Game } from './game.js';
 import { Renderer } from './renderer.js';
+import { MapEditor } from './editor.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -15,6 +16,8 @@ let lastTime = 0;
 let accumulator = 0;
 let gameModeSelection = GAME_MODE.ESCAPE;
 let mapTypeSelection = MAP_TYPE.HYBRID;
+let customMapData = null;
+let editor = null;
 
 const menuScreen = document.getElementById('menu-screen');
 const gameScreen = document.getElementById('game-screen');
@@ -125,6 +128,15 @@ function buildMenu() {
   btnTutorial.textContent = '游戏教程';
   btnTutorial.onclick = () => showScreen('tutorial-screen');
   menuButtons.appendChild(btnTutorial);
+
+  const btnEditor = document.createElement('button');
+  btnEditor.className = 'pixel-btn';
+  btnEditor.textContent = '地图编辑器';
+  btnEditor.onclick = () => {
+    showScreen('editor-screen');
+    initEditor();
+  };
+  menuButtons.appendChild(btnEditor);
 }
 
 function buildMapSelect() {
@@ -156,10 +168,33 @@ function buildMapSelect() {
 }
 
 function startGame() {
-  game.init(mapTypeSelection, gameModeSelection);
+  if (mapTypeSelection === MAP_TYPE.CUSTOM && customMapData) {
+    game.init(mapTypeSelection, gameModeSelection, customMapData);
+  } else {
+    game.init(mapTypeSelection, gameModeSelection);
+  }
   showScreen('game-screen');
   lastTime = 0;
   accumulator = 0;
+}
+
+function initEditor() {
+  const editorCanvas = document.getElementById('editor-canvas');
+  const editorStatus = document.getElementById('editor-status');
+  if (!editor) {
+    editor = new MapEditor(editorCanvas, editorStatus);
+  }
+
+  document.getElementById('btn-editor-test').onclick = () => {
+    customMapData = editor.getMapData();
+    mapTypeSelection = MAP_TYPE.CUSTOM;
+    startGame();
+  };
+
+  document.getElementById('btn-editor-back').onclick = () => {
+    showScreen('menu-screen');
+    buildMenu();
+  };
 }
 
 function showScreen(id) {
@@ -194,7 +229,11 @@ function showResult() {
 }
 
 document.getElementById('btn-restart').onclick = () => {
-  game.init(mapTypeSelection, gameModeSelection);
+  if (mapTypeSelection === MAP_TYPE.CUSTOM && customMapData) {
+    game.init(mapTypeSelection, gameModeSelection, customMapData);
+  } else {
+    game.init(mapTypeSelection, gameModeSelection);
+  }
   showScreen('game-screen');
   lastTime = 0;
   accumulator = 0;

@@ -277,3 +277,92 @@ body { background: #0a0a0a; color: #e0e0e0; font-family: 'Press Start 2P', monos
   color: #fff;
   box-shadow: 0 0 15px rgba(136, 136, 136, 0.4);
 }
+
+/* --- Editor Screen --- */
+#editor-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+#editor-container {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+#editor-canvas {
+  image-rendering: pixelated;
+  border: 3px solid #333;
+  background: #0a0a0a;
+  cursor: crosshair;
+}
+
+#editor-sidebar {
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.editor-section-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  color: #888;
+  margin: 0;
+  letter-spacing: 1px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #222;
+}
+
+.editor-tile-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 2px solid #333;
+  background: #1a1a2e;
+  color: #bbb;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.1s, background 0.1s;
+  text-align: left;
+}
+
+.editor-tile-btn:hover {
+  border-color: #e94560;
+  background: #2a1a2e;
+}
+
+.editor-tile-btn.selected {
+  border-color: #4ecdc4;
+  background: #1a2e2e;
+  box-shadow: 0 0 8px rgba(78, 205, 196, 0.3);
+}
+
+.tile-swatch {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #555;
+  flex-shrink: 0;
+  image-rendering: pixelated;
+}
+
+.editor-action-btn {
+  width: 100%;
+  font-size: 12px;
+  padding: 10px 16px;
+  margin: 4px 0;
+}
+
+#editor-status {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  color: #e94560;
+  line-height: 1.6;
+  min-height: 30px;
+  margin-top: 6px;
+}

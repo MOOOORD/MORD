@@ -1,5 +1,5 @@
 // objectives.js
-import { TILE_SIZE, REPAIR_TIME, REPAIR_PHASES, GATE_OPEN_TIME } from './constants.js';
+import { TILE_SIZE, REPAIR_TIME, REPAIR_PHASES, GATE_OPEN_TIME, PALLET_STUN_TIME } from './constants.js';
 
 export class ObjectivesManager {
   constructor(gameMap) {
@@ -120,7 +120,7 @@ export class ObjectivesManager {
       const kCol = Math.floor(killer.x / TILE_SIZE);
       const kRow = Math.floor(killer.y / TILE_SIZE);
       if (kCol === pallet.x && kRow === pallet.y) {
-        killer.stunTimer = 90;
+        killer.stunTimer = PALLET_STUN_TIME;
       }
     }
     return { done: true, event: 'pallet_dropped' };

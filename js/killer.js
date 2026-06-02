@@ -2,7 +2,8 @@
 import {
   KILLER_SPEED, KILLER_CHASE_SPEED, KILLER_STATE, TILE, TILE_SIZE,
   KILLER_VISION_RANGE, KILLER_HEARING_RANGE, KILLER_ALERT_DURATION,
-  KILLER_ATTACK_WINDUP, KILLER_MISS_WIPE, KILLER_HIT_WIPE,
+  KILLER_ATTACK_WARNING, KILLER_MISS_WIPE, KILLER_HIT_WIPE,
+  KILLER_BREAK_TIME, PALLET_STUN_TIME, KILLER_CHASE_RANGE,
   MAP_COLS, MAP_ROWS, PLAYER_HEALTH,
 } from './constants.js';
 
@@ -17,9 +18,12 @@ export class Killer {
     this.alertTimer = 0;
     this.carryTarget = null;
     this.stunTimer = 0;
-    this.attackPhase = 'idle';    // 'idle' | 'swing' | 'wipe'
+    this.attackPhase = 'idle';    // 'idle' | 'warning' | 'wipe'
     this.attackTimer = 0;
-    this.attackHit = false;       // whether the swing connected
+    this.attackHit = false;       // whether the attack connected
+    this.breakTimer = 0;          // pallet break animation countdown
+    this.breakTarget = null;      // pallet being broken
+    this.preBreakState = null;    // state to resume after breaking pallet
     this.windowSlowTimer = 0;     // slowdown frames after vaulting a window
     this._lastTile = -1;
     this._path = null;            // A* path waypoints
@@ -41,6 +45,23 @@ export class Killer {
       this.attackTimer = 0;
       return;
     }
+
+    // Pallet break animation
+    if (this.state === KILLER_STATE.BREAK) {
+      this.breakTimer--;
+      if (this.breakTimer <= 0) {
+        if (this.breakTarget && this.breakTarget.dropped && !this.breakTarget.broken) {
+          this.breakTarget.broken = true;
+        }
+        this.breakTarget = null;
+        this.state = this.preBreakState || KILLER_STATE.PATROL;
+        this.speed = this.state === KILLER_STATE.CHASE ? KILLER_CHASE_SPEED : KILLER_SPEED;
+        this.preBreakState = null;
+        this._clearPath();
+      }
+      return;
+    }
+
     this._updateAttack(player, gameMap);
     this._updateState(player, gameMap);
     this._executeState(dt, player, gameMap);
@@ -57,7 +78,7 @@ export class Killer {
     if (this.attackPhase === 'idle') return;
     this.attackTimer--;
     if (this.attackTimer <= 0) {
-      if (this.attackPhase === 'swing') {
+      if (this.attackPhase === 'warning') {
         const dist = this._dist(player.x, player.y);
         if (dist < 32 && this._canSee(player, gameMap)) {
           const wasInjured = player.health === PLAYER_HEALTH.INJURED;
@@ -65,10 +86,9 @@ export class Killer {
           this.attackPhase = 'wipe';
           this.attackTimer = KILLER_HIT_WIPE;
           this.attackHit = true;
-          // Immediately pick up downed player instead of waiting for wipe to end
           if (wasInjured && player.health === PLAYER_HEALTH.DOWNED) {
             this.state = KILLER_STATE.CARRY;
-            this.speed = KILLER_SPEED * 0.7;
+            this.speed = KILLER_SPEED * 0.95;
             this._findNearestHook(gameMap);
             this._clearPath();
           }
@@ -103,7 +123,7 @@ export class Killer {
         break;
 
       case KILLER_STATE.CHASE:
-        if (!canSeePlayer || distToPlayer > KILLER_VISION_RANGE * TILE_SIZE * 1.5) {
+        if (!canSeePlayer || distToPlayer > KILLER_CHASE_RANGE * TILE_SIZE) {
           this.state = KILLER_STATE.ALERT;
           this.alertPos = this.lastPlayerSeen ? { ...this.lastPlayerSeen } : { x: player.x, y: player.y };
           this.alertTimer = KILLER_ALERT_DURATION;
@@ -117,7 +137,7 @@ export class Killer {
         }
         if (player.health === 'downed' && distToPlayer < 32 && this.attackPhase === 'idle') {
           this.state = KILLER_STATE.CARRY;
-          this.speed = KILLER_SPEED * 0.7;
+          this.speed = KILLER_SPEED * 0.95;
           this._findNearestHook(gameMap);
         }
         break;
@@ -144,7 +164,7 @@ export class Killer {
         && this.state !== KILLER_STATE.CARRY && this.state !== KILLER_STATE.BREAK) {
       if (distToPlayer < 64) {
         this.state = KILLER_STATE.CARRY;
-        this.speed = KILLER_SPEED * 0.7;
+        this.speed = KILLER_SPEED * 0.95;
         this._findNearestHook(gameMap);
       } else if (canSeePlayer) {
         // Player downed but far — chase them first
@@ -205,8 +225,6 @@ export class Killer {
         }
         break;
       case KILLER_STATE.BREAK:
-        this.stunTimer = 60;
-        this.state = KILLER_STATE.PATROL;
         break;
     }
   }
@@ -287,7 +305,7 @@ export class Killer {
     if (!target) return;
 
     let moveMult = 1;
-    if (this.attackPhase === 'swing') moveMult = 0.5;
+    if (this.attackPhase === 'warning') moveMult = 0.7;
     if (this.attackPhase === 'wipe') moveMult = 0.2;
     if (this.windowSlowTimer > 0) moveMult = Math.min(moveMult, 0.4);
 
@@ -298,15 +316,18 @@ export class Killer {
       this._moveDirect(dt, target, gameMap, moveMult);
     }
 
-    // Check for dropped pallets — always break through
+    // Check for dropped pallets — spend 1 second breaking through
     const tileCol = Math.floor(this.x / TILE_SIZE);
     const tileRow = Math.floor(this.y / TILE_SIZE);
     const pallet = gameMap.pallets.find(p =>
       p.x === tileCol && p.y === tileRow && p.dropped && !p.broken
     );
     if (pallet) {
-      pallet.broken = true;
+      this.preBreakState = this.state;
       this.state = KILLER_STATE.BREAK;
+      this.breakTimer = KILLER_BREAK_TIME;
+      this.breakTarget = pallet;
+      this._clearPath();
     }
   }
 
@@ -422,7 +443,8 @@ export class Killer {
         const wy = ny * TILE_SIZE + TILE_SIZE / 2;
         if (!gameMap.isWalkable(wx, wy, false)) continue;
 
-        const tg = gScore[ck] + 1;
+        const moveCost = gameMap.grid[ny][nx] === TILE.WINDOW ? 0.3 : 1;
+        const tg = gScore[ck] + moveCost;
         if (tg < (gScore[nk] || Infinity)) {
           gScore[nk] = tg;
           cameFrom[nk] = ck;
@@ -445,8 +467,8 @@ export class Killer {
   }
 
   _attack(player) {
-    this.attackPhase = 'swing';
-    this.attackTimer = KILLER_ATTACK_WINDUP;
+    this.attackPhase = 'warning';
+    this.attackTimer = KILLER_ATTACK_WARNING;
   }
 
   _canSee(player, gameMap) {
@@ -541,16 +563,45 @@ export class Killer {
 
     if (this.stunTimer > 0 && Math.floor(this.stunTimer / 6) % 2 === 0) return;
 
-    // Attack swing arc
-    if (this.attackPhase === 'swing') {
-      const progress = 1 - this.attackTimer / KILLER_ATTACK_WINDUP;
+    // Pallet break animation
+    if (this.state === KILLER_STATE.BREAK) {
+      const progress = 1 - this.breakTimer / KILLER_BREAK_TIME;
       ctx.save();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 3;
-      ctx.globalAlpha = 0.4 + progress * 0.6;
+      ctx.fillStyle = '#ff8c42';
+      ctx.globalAlpha = 0.3 + Math.sin(progress * Math.PI * 2) * 0.2;
       ctx.beginPath();
-      ctx.arc(sx, sy, 24, -0.6, 0.6);
+      ctx.arc(sx, sy, 16, 0, Math.PI * 2);
+      ctx.fill();
+      // Cracking lines
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(sx - 8, sy + 8); ctx.lineTo(sx + 4, sy - 6);
+      ctx.moveTo(sx + 6, sy + 10); ctx.lineTo(sx - 6, sy - 4);
       ctx.stroke();
+      ctx.restore();
+    }
+
+    // Attack warning indicator — pulsing red ring
+    if (this.attackPhase === 'warning') {
+      const progress = 1 - this.attackTimer / KILLER_ATTACK_WARNING;
+      const pulse = Math.sin(progress * Math.PI * 4) * 0.3 + 0.5;
+      ctx.save();
+      ctx.strokeStyle = '#ff3333';
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = pulse;
+      ctx.shadowColor = '#ff0000';
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 22, 0, Math.PI * 2);
+      ctx.stroke();
+      // Inner fill
+      ctx.fillStyle = '#ff0000';
+      ctx.globalAlpha = 0.15 + progress * 0.15;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 18, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
 

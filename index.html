@@ -67,6 +67,26 @@
     <button class="pixel-btn" id="btn-tutorial-back">← 返回</button>
   </div>
 </div>
+<div id="editor-screen" class="screen hidden">
+  <div id="editor-container">
+    <canvas id="editor-canvas"></canvas>
+    <div id="editor-sidebar">
+      <h3 class="editor-section-title">瓦片选择</h3>
+      <div id="editor-palette"></div>
+      <h3 class="editor-section-title">操作</h3>
+      <div id="editor-actions">
+        <button class="pixel-btn editor-action-btn" id="btn-editor-export">导出JSON</button>
+        <button class="pixel-btn editor-action-btn" id="btn-editor-import">导入JSON</button>
+        <button class="pixel-btn editor-action-btn" id="btn-editor-clear">清空地图</button>
+        <button class="pixel-btn editor-action-btn" id="btn-editor-validate">验证地图</button>
+        <button class="pixel-btn editor-action-btn" id="btn-editor-test">开始游戏</button>
+        <button class="pixel-btn editor-action-btn" id="btn-editor-back">← 返回</button>
+      </div>
+      <div id="editor-status"></div>
+    </div>
+  </div>
+  <input type="file" id="editor-file-input" accept=".json" style="display:none">
+</div>
 <div id="result-screen" class="screen hidden">
   <h2 id="result-title" class="result-title"></h2>
   <div id="result-icon"></div>

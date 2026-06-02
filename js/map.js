@@ -2,7 +2,7 @@
 import { TILE, MAP_COLS, MAP_ROWS, MAP_TYPE, TILE_SIZE, CANVAS_WIDTH, CANVAS_HEIGHT } from './constants.js';
 
 export class GameMap {
-  constructor(type) {
+  constructor(type, data = null) {
     this.type = type;
     this.cols = MAP_COLS;
     this.rows = MAP_ROWS;
@@ -12,7 +12,12 @@ export class GameMap {
     this.hooks = [];         // [{x, y}]
     this.pallets = [];       // [{x, y, dropped, broken}]
     this.obstacles = [];     // [{x, y, w, h}] for collision
-    this._generate();
+
+    if (data !== null) {
+      this._loadFromData(data);
+    } else {
+      this._generate();
+    }
   }
 
   _generate() {
@@ -26,6 +31,7 @@ export class GameMap {
     this._placeExitGates();
     this._placeHooks();
     this._placePallets();
+    this._ensureCorridorPallets();
     this._placeWindows();
     this._buildObstacleList();
   }
@@ -213,7 +219,6 @@ export class GameMap {
         }
       }
     }
-    // Sort by blocked count (descending) — choke points first, room interiors (0 blocked) excluded
     candidates.sort((a, b) => b.blocked - a.blocked);
     this.pallets = candidates.slice(0, 16).map(({ r, c }) => {
       this.grid[r][c] = TILE.PALLET;
@@ -226,7 +231,6 @@ export class GameMap {
     for (let r = 1; r < this.rows - 1; r++) {
       for (let c = 1; c < this.cols - 1; c++) {
         if (this.grid[r][c] !== TILE.WALL) continue;
-        // Window needs floor on two opposite sides so vaulting through is useful
         const left = this.grid[r][c - 1], right = this.grid[r][c + 1];
         const up = this.grid[r - 1][c], down = this.grid[r + 1][c];
         const isFloor = t => t === TILE.FLOOR || t === TILE.GENERATOR || t === TILE.PALLET;
@@ -242,6 +246,28 @@ export class GameMap {
     }
   }
 
+  _ensureCorridorPallets() {
+    // Place a pallet in every narrow corridor segment
+    for (let r = 2; r < this.rows - 2; r++) {
+      for (let c = 2; c < this.cols - 2; c++) {
+        if (this.grid[r][c] !== TILE.FLOOR) continue;
+        const nWall = this.grid[r - 1][c] === TILE.WALL;
+        const sWall = this.grid[r + 1][c] === TILE.WALL;
+        const wWall = this.grid[r][c - 1] === TILE.WALL;
+        const eWall = this.grid[r][c + 1] === TILE.WALL;
+        const isCorridor = (nWall && sWall) || (wWall && eWall);
+        if (!isCorridor) continue;
+        const hasPalletNear = this.pallets.some(p =>
+          Math.abs(p.x - c) <= 3 && Math.abs(p.y - r) <= 3
+        );
+        if (!hasPalletNear && this.pallets.length < 16) {
+          this.grid[r][c] = TILE.PALLET;
+          this.pallets.push({ x: c, y: r, dropped: false, broken: false });
+        }
+      }
+    }
+  }
+
   _buildObstacleList() {
     this.obstacles = [];
     for (let r = 0; r < this.rows; r++) {
@@ -251,6 +277,57 @@ export class GameMap {
         }
       }
     }
+  }
+
+  _rebuildFromGrid() {
+    this.generators = [];
+    this.exitGates = [];
+    this.hooks = [];
+    this.pallets = [];
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        switch (this.grid[r][c]) {
+          case TILE.GENERATOR:
+            this.generators.push({ x: c, y: r, repaired: false });
+            break;
+          case TILE.HOOK:
+            this.hooks.push({ x: c, y: r });
+            break;
+          case TILE.EXIT_GATE:
+            this.exitGates.push({ x: c, y: r, open: false, powered: false });
+            break;
+          case TILE.PALLET:
+            this.pallets.push({ x: c, y: r, dropped: false, broken: false });
+            break;
+        }
+      }
+    }
+  }
+
+  _loadFromData(data) {
+    if (data.grid && Array.isArray(data.grid) && data.grid.length === this.rows) {
+      this.grid = data.grid.map(row => [...row]);
+    } else {
+      this._initFloor();
+    }
+    this._rebuildFromGrid();
+    this._buildObstacleList();
+  }
+
+  toJSON() {
+    return JSON.stringify({
+      version: 1,
+      name: 'custom',
+      grid: this.grid,
+    }, null, 2);
+  }
+
+  static fromJSON(jsonString) {
+    const data = JSON.parse(jsonString);
+    if (!data.grid || !Array.isArray(data.grid)) {
+      throw new Error('无效的地图数据：缺少 grid');
+    }
+    return new GameMap(MAP_TYPE.CUSTOM, data);
   }
 
   render(ctx, cameraX, cameraY) {
@@ -319,10 +396,6 @@ export class GameMap {
     const tile = this.grid[r][c];
     if (tile === TILE.WALL || tile === TILE.OBSTACLE) return false;
     if (tile === TILE.WINDOW && isPlayer) return false;
-    if (!isPlayer) {
-      const pallet = this.pallets.find(p => p.x === c && p.y === r && p.dropped && !p.broken);
-      if (pallet) return false;
-    }
     return true;
   }
 }

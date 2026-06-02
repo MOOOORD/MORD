@@ -4,6 +4,7 @@ export const MAP_COLS = 30;
 export const MAP_ROWS = 22;
 export const CANVAS_WIDTH = 960;   // 30 * 32
 export const CANVAS_HEIGHT = 704;  // 22 * 32
+export const EDITOR_TILE_SIZE = 24;
 
 export const TILE = {
   FLOOR: 0,
@@ -14,6 +15,17 @@ export const TILE = {
   EXIT_GATE: 5,
   PALLET: 6,
   WINDOW: 7,
+};
+
+export const TILE_LABELS = {
+  [TILE.FLOOR]:      { name: '地板',   color: '#1a1a2e' },
+  [TILE.WALL]:       { name: '墙壁',   color: '#16213e' },
+  [TILE.OBSTACLE]:   { name: '障碍物', color: '#0f3460' },
+  [TILE.GENERATOR]:  { name: '发电机', color: '#f0c040' },
+  [TILE.HOOK]:       { name: '钩子',   color: '#a0522d' },
+  [TILE.EXIT_GATE]:  { name: '大门',   color: '#4ecca3' },
+  [TILE.PALLET]:     { name: '板子',   color: '#ff8c42' },
+  [TILE.WINDOW]:     { name: '窗户',   color: '#5a8ab5' },
 };
 
 export const PLAYER_SPEED = 2.5;       // px per frame
@@ -31,16 +43,20 @@ export const GATE_OPEN_TIME = 240;     // frames (4 seconds)
 export const HOOK_STRUGGLE_TIME = 120; // frames
 export const HOOK_ESCAPE_CHANCE = 0.12;
 export const HOOK_MAX_COUNT = 3;
-export const PALLET_STUN_TIME = 90;    // frames
+export const PALLET_STUN_TIME = 180;   // frames (3 seconds) — stun when pallet dropped on killer
+export const KILLER_BREAK_TIME = 60;   // frames (1 second) — time to break a dropped pallet
 export const PLAYER_HIT_BOOST_SPEED = 6.5;   // burst speed after being hit
 export const PLAYER_HIT_BOOST_DURATION = 120; // frames of speed boost (2s)
-export const KILLER_ATTACK_WINDUP = 18;      // swing animation frames
+export const KILLER_ATTACK_WARNING = 18;     // frames — visible warning before attack hits
 export const KILLER_MISS_WIPE = 60;           // 1 second wipe on miss
 export const KILLER_HIT_WIPE = 240;           // 4 seconds wipe on hit
+export const REPAIR_DECAY_RATE = 0.1;         // slow decay when no key pressed
+export const REPAIR_DECAY_FAST = 0.05;        // slow decay when wrong key pressed
 
 export const KILLER_VISION_RANGE = 8;  // tiles
 export const KILLER_HEARING_RANGE = 6; // tiles, for repair noise
 export const KILLER_ALERT_DURATION = 180; // frames
+export const KILLER_CHASE_RANGE = 14;  // tiles — lose chase beyond this distance
 
 export const PLAYER_VISION_RADIUS = 200; // pixels around player that are visible
 export const SCORE_MODE_TIME = 300;    // seconds (5 minutes)
@@ -63,6 +79,7 @@ export const MAP_TYPE = {
   ROOMS: 'rooms',
   OPEN: 'open',
   HYBRID: 'hybrid',
+  CUSTOM: 'custom',
 };
 
 export const KILLER_STATE = {

@@ -1,5 +1,5 @@
 // game.js
-import { STATE, GAME_MODE, PLAYER_HEALTH, SCORE_MODE_TIME, KILLER_SPEED } from './constants.js';
+import { STATE, GAME_MODE, PLAYER_HEALTH, SCORE_MODE_TIME, KILLER_SPEED, REPAIR_DECAY_RATE, REPAIR_DECAY_FAST } from './constants.js';
 import { GameMap } from './map.js';
 import { Player } from './player.js';
 import { Killer } from './killer.js';
@@ -27,10 +27,10 @@ export class Game {
     this.powerFlash = 0;
   }
 
-  init(mapType, mode) {
+  init(mapType, mode, mapData = null) {
     this.mapType = mapType;
     this.mode = mode;
-    this.map = new GameMap(mapType);
+    this.map = new GameMap(mapType, mapData);
     this.player = new Player(96, this.map.rows * 16);
     this.killer = new Killer((this.map.cols - 3) * 32, this.map.rows * 16);
     this.objectives = new ObjectivesManager(this.map);
@@ -85,7 +85,7 @@ export class Game {
           }
         }
       } else {
-        this.player.interactProgress = Math.max(0, this.player.interactProgress - 0.5);
+        this.player.interactProgress = Math.max(0, this.player.interactProgress - REPAIR_DECAY_FAST);
         this.player.interacting = false;
       }
     } else if (this.keys['Space']) {
@@ -106,12 +106,12 @@ export class Game {
             }
           }
         } else {
-          this.player.interactProgress = Math.max(0, this.player.interactProgress - 0.5);
+          this.player.interactProgress = Math.max(0, this.player.interactProgress - REPAIR_DECAY_FAST);
           this.player.interacting = false;
         }
       }
     } else {
-      this.player.interactProgress = Math.max(0, this.player.interactProgress - 1);
+      this.player.interactProgress = Math.max(0, this.player.interactProgress - REPAIR_DECAY_RATE);
       this.player.interacting = false;
     }
 
