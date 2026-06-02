@@ -388,17 +388,14 @@ function initLobby() {
 function startMultiplayerGame(isHost, role) {
   isMultiplayerGame = true;
 
-  const mapData = (mapTypeSelection === MAP_TYPE.CUSTOM && customMapData) ? customMapData : null;
-
   if (isHost) {
-    if (mapTypeSelection === MAP_TYPE.CUSTOM && customMapData) {
-      game.init(mapTypeSelection, gameModeSelection, customMapData);
-    } else {
-      game.init(mapTypeSelection, gameModeSelection);
-    }
-    game.initMultiplayer(mapTypeSelection, gameModeSelection, mapData, role || PLAYER_ROLE.SURVIVOR, true, network);
+    // Multiplayer defaults to "蹲出生天" map
+    const mpType = MAP_TYPE.CUSTOM;
+    const mpData = DUN_BIRTH;
+    game.init(mpType, gameModeSelection, mpData);
+    game.initMultiplayer(mpType, gameModeSelection, mpData, role || PLAYER_ROLE.SURVIVOR, true, network);
     const mapJson = game.map.toJSON();
-    network.send('game_event', { event: 'game_start', mapType: mapTypeSelection, mode: gameModeSelection, mapData: mapJson, hostRole: role });
+    network.send('game_event', { event: 'game_start', mapType: mpType, mode: gameModeSelection, mapData: mapJson, hostRole: role });
     showScreen('game-screen');
     lastTime = 0;
     accumulator = 0;
