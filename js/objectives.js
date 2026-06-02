@@ -17,6 +17,9 @@ export class ObjectivesManager {
   getNearbyInteractable(playerX, playerY, types = null) {
     const col = Math.floor(playerX / TILE_SIZE);
     const row = Math.floor(playerY / TILE_SIZE);
+    const halfT = TILE_SIZE / 2;
+    let bestWindow = null;
+    let bestWinDist = Infinity;
 
     for (let dr = -1; dr <= 1; dr++) {
       for (let dc = -1; dc <= 1; dc++) {
@@ -24,24 +27,27 @@ export class ObjectivesManager {
         const c = col + dc;
         if (r < 0 || r >= this.map.rows || c < 0 || c >= this.map.cols) continue;
         const tile = this.map.grid[r][c];
+        const cx = c * TILE_SIZE + halfT;
+        const cy = r * TILE_SIZE + halfT;
+        const pxDist = Math.hypot(cx - playerX, cy - playerY);
 
         if (tile === 3 && (!types || types.includes('generator'))) {
           const gen = this.map.generators.find(g => g.x === c && g.y === r);
-          if (gen && !gen.repaired) {
+          if (gen && !gen.repaired && pxDist < TILE_SIZE + 4) {
             return { type: 'generator', obj: gen, x: c, y: r };
           }
         }
 
         if (tile === 5 && (!types || types.includes('exit_gate'))) {
           const gate = this.map.exitGates.find(g => g.x === c && g.y === r);
-          if (gate && gate.powered && !gate.open) {
+          if (gate && gate.powered && !gate.open && pxDist < TILE_SIZE + 4) {
             return { type: 'exit_gate', obj: gate, x: c, y: r };
           }
         }
 
         if (tile === 6 && (!types || types.includes('pallet'))) {
           const pal = this.map.pallets.find(p => p.x === c && p.y === r);
-          if (pal && !pal.dropped && !pal.broken) {
+          if (pal && !pal.dropped && !pal.broken && pxDist < TILE_SIZE + 4) {
             return { type: 'pallet', obj: pal, x: c, y: r };
           }
         }
@@ -50,12 +56,17 @@ export class ObjectivesManager {
           const key = `${c},${r}`;
           if (this.windowCooldowns[key] && this.windowCooldowns[key] > 0) continue;
           const dest = this._getVaultDest(c, r, col, row);
-          if (dest) {
-            return { type: 'window', x: c, y: r, dest };
+          if (dest && pxDist < TILE_SIZE) {
+            if (pxDist < bestWinDist) {
+              bestWinDist = pxDist;
+              bestWindow = { type: 'window', x: c, y: r, dest };
+            }
           }
         }
       }
     }
+
+    if (bestWindow) return bestWindow;
     return null;
   }
 
