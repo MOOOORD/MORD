@@ -3,7 +3,6 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT, STATE, GAME_MODE, MAP_TYPE, PLAYER_ROLE } 
 import { Game } from './game.js';
 import { Renderer } from './renderer.js';
 import { MapEditor } from './editor.js';
-import { P2PClient } from './p2p.js';
 import { Lobby } from './lobby.js';
 import { DUN_BIRTH } from './maps.js';
 
@@ -64,6 +63,7 @@ function startQuoteRotation() {
   if (quoteInterval) clearInterval(quoteInterval);
   quoteInterval = setInterval(pick, 10000);
 }
+window.startQuoteRotation = startQuoteRotation;
 
 const menuScreen = document.getElementById('menu-screen');
 const gameScreen = document.getElementById('game-screen');
@@ -365,20 +365,18 @@ function initEditor() {
 }
 
 function initLobby() {
-  if (!network) {
-    network = new P2PClient();
+  // Always create fresh lobby so mode/network is clean
+  if (lobby && lobby.getNetwork()) {
+    lobby.getNetwork().disconnect();
   }
-  if (!lobby) {
-    lobby = new Lobby(network, (isHost, role, gameData) => {
-      if (isHost) {
-        startMultiplayerGame(true, role);
-      } else {
-        // Client: lobby already received game_start, pass data directly
-        pendingGameStart = gameData;
-        startMultiplayerGame(false, role);
-      }
-    });
-  }
+  lobby = new Lobby((isHost, role, gameData) => {
+    if (isHost) {
+      startMultiplayerGame(true, role);
+    } else {
+      pendingGameStart = gameData;
+      startMultiplayerGame(false, role);
+    }
+  });
   lobby.render(
     document.getElementById('lobby-content'),
     document.getElementById('lobby-status')
@@ -387,6 +385,7 @@ function initLobby() {
 
 function startMultiplayerGame(isHost, role) {
   isMultiplayerGame = true;
+  network = lobby.getNetwork();
 
   if (isHost) {
     // Multiplayer defaults to "蹲出生天" map
@@ -468,8 +467,10 @@ document.getElementById('btn-restart').onclick = () => {
 
 document.getElementById('btn-menu').onclick = () => {
   if (isMultiplayerGame) {
-    network.disconnect();
+    if (network) network.disconnect();
+    if (lobby && lobby.getNetwork()) lobby.getNetwork().disconnect();
     isMultiplayerGame = false;
+    network = null;
     game = new Game();
   }
   showScreen('menu-screen');

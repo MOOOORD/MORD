@@ -1,31 +1,104 @@
-// lobby.js — multiplayer lobby UI (P2P WebRTC)
+// lobby.js — multiplayer lobby UI (P2P + Server relay)
 import { LOBBY_STATE, PLAYER_ROLE } from './constants.js';
+import { P2PClient } from './p2p.js';
+import { NetworkClient } from './network.js';
+
+const SERVER_URL = 'ws://localhost:3000';
 
 export class Lobby {
-  constructor(p2p, onStartGame) {
-    this.p2p = p2p;
+  constructor(onStartGame) {
     this.onStartGame = onStartGame;
+    this.network = null;
+    this.mode = null;       // 'p2p' or 'server'
     this.state = LOBBY_STATE.IDLE;
     this.selectedRole = null;
     this._amHost = false;
     this._offer = '';
     this._answer = '';
+    this._roomCode = '';
+    this._serverUrl = SERVER_URL;
   }
+
+  getNetwork() { return this.network; }
 
   render(container, statusEl) {
     this._container = container;
     this._statusEl = statusEl;
-    this._drawIdle();
+    this._drawModeSelect();
   }
 
-  _drawIdle() {
+  // ==================== Mode select ====================
+
+  _drawModeSelect() {
     this.state = LOBBY_STATE.IDLE;
     this._container.innerHTML = '';
     this._setStatus('', '');
 
+    const title = document.createElement('p');
+    title.style.cssText = 'font-size:14px;color:#ccc;text-align:center;margin-bottom:20px';
+    title.textContent = '选择联机方式';
+
+    const row = document.createElement('div');
+    row.className = 'lobby-row';
+
+    const btnP2P = document.createElement('button');
+    btnP2P.className = 'pixel-btn';
+    btnP2P.textContent = 'P2P 直连';
+    btnP2P.title = '无需服务器，通过复制粘贴连接码建立直连';
+    btnP2P.onclick = () => this._startP2P();
+
+    const btnServer = document.createElement('button');
+    btnServer.className = 'pixel-btn';
+    btnServer.textContent = '服务器中继';
+    btnServer.title = '通过中继服务器转发，更稳定可靠';
+    btnServer.style.borderColor = '#4ecca3';
+    btnServer.style.color = '#4ecca3';
+    btnServer.onclick = () => this._drawServerConnect();
+
+    const p2pHint = document.createElement('p');
+    p2pHint.style.cssText = 'font-size:10px;color:#666;text-align:center;margin-top:4px';
+    p2pHint.textContent = '复制粘贴连接码，无需服务器';
+
+    const srvHint = document.createElement('p');
+    srvHint.style.cssText = 'font-size:10px;color:#4ecca3;text-align:center;margin-top:4px';
+    srvHint.textContent = '需要房主运行服务器 · 更稳定';
+
+    const btnBack = document.createElement('button');
+    btnBack.className = 'pixel-btn';
+    btnBack.textContent = '← 返回';
+    btnBack.style.borderColor = '#888';
+    btnBack.style.color = '#aaa';
+    btnBack.onclick = () => {
+      document.getElementById('lobby-screen').classList.add('hidden');
+      document.getElementById('menu-screen').classList.remove('hidden');
+      if (typeof window.startQuoteRotation === 'function') window.startQuoteRotation();
+    };
+
+    row.appendChild(btnP2P);
+    row.appendChild(btnServer);
+    this._container.appendChild(title);
+    this._container.appendChild(row);
+    this._container.appendChild(p2pHint);
+    this._container.appendChild(srvHint);
+    this._container.appendChild(btnBack);
+  }
+
+  // ==================== P2P mode ====================
+
+  _startP2P() {
+    this.mode = 'p2p';
+    this.network = new P2PClient();
+    this._drawP2PIdle();
+  }
+
+  _drawP2PIdle() {
+    this.state = LOBBY_STATE.IDLE;
+    this._container.innerHTML = '';
+    this._setStatus('P2P 直连模式', '');
+
     const info = document.createElement('p');
     info.style.cssText = 'font-size:12px;color:#666;text-align:center;margin-bottom:16px;';
-    info.textContent = '两台设备通过 P2P 直连，无需服务器，无需注册';
+    info.textContent = '两台设备通过 WebRTC 直连，无需服务器，无需注册';
 
     const row = document.createElement('div');
     row.className = 'lobby-row';
@@ -46,10 +119,8 @@ export class Lobby {
     btnBack.style.borderColor = '#888';
     btnBack.style.color = '#aaa';
     btnBack.onclick = () => {
-      this.p2p.disconnect();
-      document.getElementById('lobby-screen').classList.add('hidden');
-      document.getElementById('menu-screen').classList.remove('hidden');
-      if (typeof startQuoteRotation === 'function') startQuoteRotation();
+      this.network.disconnect();
+      this._drawModeSelect();
     };
 
     row.appendChild(btnCreate);
@@ -59,7 +130,7 @@ export class Lobby {
     this._container.appendChild(btnBack);
   }
 
-  // ==================== Host: create room ====================
+  // --- P2P Host ---
 
   async _drawHostCode() {
     this._amHost = true;
@@ -68,7 +139,7 @@ export class Lobby {
 
     let offer;
     try {
-      offer = await this.p2p.createOffer();
+      offer = await this.network.createOffer();
     } catch (e) {
       this._setStatus(e.message || '生成连接失败，请刷新重试', 'error');
       return;
@@ -83,7 +154,6 @@ export class Lobby {
     this._container.innerHTML = '';
     this._setStatus('等待朋友回应...', 'connecting');
 
-    // Step 1: show offer with copy button
     const step1 = document.createElement('p');
     step1.style.cssText = 'font-size:13px;color:#f0c040;margin-bottom:4px';
     step1.textContent = '① 复制下方连接码，发给朋友（微信/QQ 都行）';
@@ -108,7 +178,6 @@ export class Lobby {
       setTimeout(() => { btnCopy.textContent = '📋 复制连接码'; }, 2000);
     };
 
-    // Step 2: input for friend's answer
     const step2 = document.createElement('p');
     step2.style.cssText = 'font-size:13px;color:#f0c040;margin:16px 0 4px';
     step2.textContent = '② 粘贴朋友发回的回应码：';
@@ -127,16 +196,17 @@ export class Lobby {
       const answer = answerTA.value.trim();
       if (!answer) { this._setStatus('请先粘贴朋友的回应码', 'error'); return; }
       this._setStatus('正在建立连接...', 'connecting');
+      btnConfirm.disabled = true;
+      btnConfirm.textContent = '连接中...';
       try {
-        await this.p2p.setAnswer(answer);
-        // Wait for data channel to open
+        await this.network.setAnswer(answer);
         await this._waitForConnect();
         this._drawRoleSelect();
       } catch (e) {
         this._setStatus(e.message || '连接失败，请让朋友重新生成回应码', 'error');
+        btnConfirm.disabled = false;
+        btnConfirm.textContent = '✓ 确认连接';
       }
-      btnConfirm.disabled = false;
-      btnConfirm.textContent = '✓ 确认连接';
     };
 
     const btnCancel = document.createElement('button');
@@ -144,7 +214,7 @@ export class Lobby {
     btnCancel.textContent = '取消';
     btnCancel.style.borderColor = '#888';
     btnCancel.style.color = '#aaa';
-    btnCancel.onclick = () => { this.p2p.disconnect(); this._drawIdle(); };
+    btnCancel.onclick = () => { this.network.disconnect(); this._drawP2PIdle(); };
 
     this._container.appendChild(step1);
     this._container.appendChild(ta);
@@ -155,7 +225,7 @@ export class Lobby {
     this._container.appendChild(btnCancel);
   }
 
-  // ==================== Guest: join room ====================
+  // --- P2P Guest ---
 
   _drawGuestInput() {
     this._amHost = false;
@@ -180,12 +250,16 @@ export class Lobby {
       const offer = ta.value.trim();
       if (!offer) { this._setStatus('请先粘贴连接码', 'error'); return; }
       this._setStatus('正在生成回应...', 'connecting');
+      btnNext.disabled = true;
+      btnNext.textContent = '处理中...';
       try {
-        const answer = await this.p2p.acceptOffer(offer);
+        const answer = await this.network.acceptOffer(offer);
         this._answer = answer;
         this._drawGuestAnswer();
       } catch (e) {
         this._setStatus(e.message || '连接码无效，请检查是否完整复制', 'error');
+        btnNext.disabled = false;
+        btnNext.textContent = '下一步 →';
       }
     };
 
@@ -194,7 +268,7 @@ export class Lobby {
     btnBack.textContent = '← 返回';
     btnBack.style.borderColor = '#888';
     btnBack.style.color = '#aaa';
-    btnBack.onclick = () => { this.p2p.disconnect(); this._drawIdle(); };
+    btnBack.onclick = () => { this.network.disconnect(); this._drawP2PIdle(); };
 
     this._container.appendChild(step1);
     this._container.appendChild(ta);
@@ -240,7 +314,7 @@ export class Lobby {
     btnCancel.textContent = '取消';
     btnCancel.style.borderColor = '#888';
     btnCancel.style.color = '#aaa';
-    btnCancel.onclick = () => { this.p2p.disconnect(); this._drawIdle(); };
+    btnCancel.onclick = () => { this.network.disconnect(); this._drawP2PIdle(); };
 
     this._container.appendChild(step2);
     this._container.appendChild(ta);
@@ -248,12 +322,219 @@ export class Lobby {
     this._container.appendChild(hint);
     this._container.appendChild(btnCancel);
 
-    // Wait for data channel to open (host will set answer)
     this._waitForConnect().then(() => {
-      if (this.p2p.connectionState === 'connected') {
+      if (this.network.connectionState === 'connected') {
         this._drawRoleSelect();
       }
     });
+  }
+
+  // ==================== Server mode ====================
+
+  _drawServerConnect() {
+    this.mode = 'server';
+    this.state = LOBBY_STATE.IDLE;
+    this._container.innerHTML = '';
+    this._setStatus('服务器中继模式', '');
+
+    const info = document.createElement('p');
+    info.style.cssText = 'font-size:12px;color:#aaa;text-align:center;margin-bottom:8px';
+    info.textContent = '房主需先在终端运行 node start-server.js --tunnel';
+
+    const urlLabel = document.createElement('p');
+    urlLabel.style.cssText = 'font-size:12px;color:#888;margin:12px 0 4px';
+    urlLabel.textContent = '服务器地址：';
+
+    const urlInput = document.createElement('input');
+    urlInput.type = 'text';
+    urlInput.value = this._serverUrl;
+    urlInput.style.cssText =
+      'width:100%;padding:8px;background:#111;border:1px solid #444;color:#ccc;' +
+      'font-size:12px;font-family:monospace;border-radius:2px;';
+    urlInput.onchange = () => { this._serverUrl = urlInput.value.trim(); };
+
+    const row = document.createElement('div');
+    row.className = 'lobby-row';
+    row.style.marginTop = '16px';
+
+    const btnHost = document.createElement('button');
+    btnHost.className = 'pixel-btn';
+    btnHost.textContent = '创建房间';
+    btnHost.style.borderColor = '#4ecca3';
+    btnHost.style.color = '#4ecca3';
+    btnHost.onclick = () => this._serverCreateRoom();
+
+    const btnGuest = document.createElement('button');
+    btnGuest.className = 'pixel-btn';
+    btnGuest.textContent = '加入房间';
+    btnGuest.onclick = () => this._serverJoinRoom();
+
+    const btnBack = document.createElement('button');
+    btnBack.className = 'pixel-btn';
+    btnBack.textContent = '← 返回';
+    btnBack.style.borderColor = '#888';
+    btnBack.style.color = '#aaa';
+    btnBack.onclick = () => this._drawModeSelect();
+
+    row.appendChild(btnHost);
+    row.appendChild(btnGuest);
+    this._container.appendChild(info);
+    this._container.appendChild(urlLabel);
+    this._container.appendChild(urlInput);
+    this._container.appendChild(row);
+    this._container.appendChild(btnBack);
+  }
+
+  _connectServer() {
+    this.network = new NetworkClient(this._serverUrl);
+
+    // Error handler
+    this.network.on('error', (msg) => {
+      this._setStatus(msg.message || '服务器错误', 'error');
+    });
+
+    // Peer events
+    this.network.on('peer_joined', () => {
+      this._setStatus('对手已加入！', 'connected');
+      if (this._amHost) {
+        this._drawRoleSelect();
+      }
+    });
+
+    this.network.on('peer_disconnected', () => {
+      this._setStatus('对手断开连接', 'error');
+    });
+
+    this.network.connect();
+  }
+
+  _serverCreateRoom() {
+    this._amHost = true;
+    this._container.innerHTML = '';
+    this._setStatus('正在连接服务器...', 'connecting');
+
+    this._connectServer();
+
+    this.network.on('room_created', (msg) => {
+      this._roomCode = msg.code;
+      this.state = LOBBY_STATE.WAITING;
+      this._drawServerHostWait();
+    });
+
+    // Wait for connection then create room
+    const checkConn = setInterval(() => {
+      if (this.network.connectionState === 'connected') {
+        clearInterval(checkConn);
+        this.network.send('create_room');
+      }
+    }, 100);
+    setTimeout(() => { clearInterval(checkConn); }, 10000);
+  }
+
+  _drawServerHostWait() {
+    this._container.innerHTML = '';
+    this._setStatus('等待对手加入...', 'connecting');
+
+    const title = document.createElement('p');
+    title.style.cssText = 'font-size:14px;color:#4ecca3;text-align:center;margin-bottom:8px';
+    title.textContent = '房间已创建';
+
+    const codeLabel = document.createElement('p');
+    codeLabel.style.cssText = 'font-size:12px;color:#888;margin-bottom:4px';
+    codeLabel.textContent = '把房间码发给朋友：';
+
+    const codeDisplay = document.createElement('div');
+    codeDisplay.style.cssText =
+      'font-size:36px;font-weight:bold;color:#f0c040;text-align:center;' +
+      'letter-spacing:8px;padding:16px;background:#111;border:2px solid #f0c040;border-radius:4px;margin-bottom:8px';
+    codeDisplay.textContent = this._roomCode;
+
+    const btnCopy = document.createElement('button');
+    btnCopy.className = 'pixel-btn';
+    btnCopy.textContent = '📋 复制房间码';
+    btnCopy.onclick = () => {
+      navigator.clipboard.writeText(this._roomCode).catch(() => {});
+      btnCopy.textContent = '已复制 ✓';
+      setTimeout(() => { btnCopy.textContent = '📋 复制房间码'; }, 2000);
+    };
+
+    const hint = document.createElement('p');
+    hint.style.cssText = 'font-size:11px;color:#666;margin-top:8px';
+    hint.textContent = '朋友在"加入房间"中输入此码即可';
+
+    const btnCancel = document.createElement('button');
+    btnCancel.className = 'pixel-btn';
+    btnCancel.textContent = '取消';
+    btnCancel.style.borderColor = '#888';
+    btnCancel.style.color = '#aaa';
+    btnCancel.style.marginTop = '16px';
+    btnCancel.onclick = () => { this.network.disconnect(); this._drawServerConnect(); };
+
+    this._container.appendChild(title);
+    this._container.appendChild(codeLabel);
+    this._container.appendChild(codeDisplay);
+    this._container.appendChild(btnCopy);
+    this._container.appendChild(hint);
+    this._container.appendChild(btnCancel);
+  }
+
+  _serverJoinRoom() {
+    this._amHost = false;
+    this._container.innerHTML = '';
+    this._setStatus('输入房间码', '');
+
+    const label = document.createElement('p');
+    label.style.cssText = 'font-size:13px;color:#f0c040;margin-bottom:8px';
+    label.textContent = '输入朋友给你的 4 位房间码：';
+
+    const codeInput = document.createElement('input');
+    codeInput.type = 'text';
+    codeInput.maxLength = 4;
+    codeInput.placeholder = '0000';
+    codeInput.style.cssText =
+      'width:100%;padding:12px;background:#111;border:2px solid #4ecca3;color:#f0c040;' +
+      'font-size:28px;font-family:monospace;text-align:center;letter-spacing:8px;border-radius:4px;';
+
+    const btnJoin = document.createElement('button');
+    btnJoin.className = 'pixel-btn';
+    btnJoin.textContent = '加入房间';
+    btnJoin.style.marginTop = '12px';
+    btnJoin.onclick = () => {
+      const code = codeInput.value.trim();
+      if (code.length !== 4 || isNaN(code)) {
+        this._setStatus('请输入 4 位数字房间码', 'error');
+        return;
+      }
+      this._setStatus('正在连接服务器...', 'connecting');
+      this._connectServer();
+
+      this.network.on('room_joined', () => {
+        this.state = LOBBY_STATE.READY;
+        this._setStatus('已加入房间！', 'connected');
+        this._roomCode = code;
+        this._drawRoleSelect();
+      });
+
+      const checkConn = setInterval(() => {
+        if (this.network.connectionState === 'connected') {
+          clearInterval(checkConn);
+          this.network.send('join_room', { code });
+        }
+      }, 100);
+      setTimeout(() => { clearInterval(checkConn); }, 10000);
+    };
+
+    const btnBack = document.createElement('button');
+    btnBack.className = 'pixel-btn';
+    btnBack.textContent = '← 返回';
+    btnBack.style.borderColor = '#888';
+    btnBack.style.color = '#aaa';
+    btnBack.onclick = () => { if (this.network) this.network.disconnect(); this._drawServerConnect(); };
+
+    this._container.appendChild(label);
+    this._container.appendChild(codeInput);
+    this._container.appendChild(btnJoin);
+    this._container.appendChild(btnBack);
   }
 
   // ==================== Role select (shared) ====================
@@ -322,12 +603,12 @@ export class Lobby {
       // Listen for game_start from host
       const onGameStart = (msg) => {
         if (msg.event === 'game_start') {
-          this.p2p.off('game_event', onGameStart);
+          this.network.off('game_event', onGameStart);
           const clientRole = msg.hostRole === 'survivor' ? 'killer' : 'survivor';
           this.onStartGame(false, clientRole, msg);
         }
       };
-      this.p2p.on('game_event', onGameStart);
+      this.network.on('game_event', onGameStart);
     }
   }
 
@@ -341,9 +622,9 @@ export class Lobby {
 
   _waitForConnect(timeout = 30000) {
     return new Promise((resolve, reject) => {
-      if (this.p2p.connectionState === 'connected') { resolve(); return; }
+      if (this.network.connectionState === 'connected') { resolve(); return; }
       const check = setInterval(() => {
-        if (this.p2p.connectionState === 'connected') {
+        if (this.network.connectionState === 'connected') {
           clearInterval(check);
           resolve();
         }
