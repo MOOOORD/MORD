@@ -1,5 +1,6 @@
 // p2p.js — WebRTC peer-to-peer client, no server needed
 // Manual copy-paste signaling: host generates offer, guest returns answer
+// Falls back to free TURN relay if STUN hole-punch fails
 
 export class P2PClient {
   constructor() {
@@ -7,9 +8,19 @@ export class P2PClient {
     this.dc = null;
     this.handlers = new Map();
     this._state = 'disconnected';
+    this._statusText = '';
+    this._onStatus = null;
   }
 
   get connectionState() { return this._state; }
+  get statusText() { return this._statusText; }
+
+  onStatusChange(fn) { this._onStatus = fn; }
+
+  _setStatus(s) {
+    this._statusText = s;
+    if (this._onStatus) this._onStatus(s);
+  }
 
   // ---- WebRTC lifecycle ----
 
@@ -18,9 +29,11 @@ export class P2PClient {
     this.dc = this.pc.createDataChannel('game');
     this._setupDataChannel();
 
+    this._setStatus('正在生成连接...');
     const offer = await this.pc.createOffer();
     await this.pc.setLocalDescription(offer);
 
+    this._setStatus('正在收集网络信息...');
     await this._waitForIceComplete();
 
     if (this._iceFailed) {
@@ -28,8 +41,8 @@ export class P2PClient {
     }
 
     this._state = 'signaling';
+    this._setStatus('等待对方连接...');
 
-    // Validate: local description must be type "offer"
     const ld = this.pc.localDescription;
     if (!ld || ld.type !== 'offer') {
       throw new Error('生成连接失败，请刷新重试');
@@ -45,6 +58,7 @@ export class P2PClient {
       this._setupDataChannel();
     };
 
+    this._setStatus('正在解析连接...');
     let raw;
     try {
       raw = decodeURIComponent(atob(offerB64));
@@ -63,10 +77,12 @@ export class P2PClient {
       throw new Error('连接码类型错误，请确认复制的是"连接码"而非"回应码"');
     }
 
+    this._setStatus('正在建立连接...');
     await this.pc.setRemoteDescription(new RTCSessionDescription(desc));
     const answer = await this.pc.createAnswer();
     await this.pc.setLocalDescription(answer);
 
+    this._setStatus('正在收集网络信息...');
     await this._waitForIceComplete();
 
     if (this._iceFailed) {
@@ -74,6 +90,7 @@ export class P2PClient {
     }
 
     this._state = 'signaling';
+    this._setStatus('等待对方确认...');
 
     const ld = this.pc.localDescription;
     if (!ld || ld.type !== 'answer') {
@@ -101,7 +118,6 @@ export class P2PClient {
       throw new Error('回应码类型错误，请确认复制的是"回应码"而非"连接码"');
     }
 
-    // Verify correct signaling state
     const st = this.pc.signalingState;
     if (st !== 'have-local-offer') {
       throw new Error(
@@ -110,30 +126,48 @@ export class P2PClient {
           : '连接状态异常(' + st + ')，请重试');
     }
 
+    this._setStatus('正在验证连接...');
     await this.pc.setRemoteDescription(new RTCSessionDescription(desc));
+
+    // ICE should now complete
+    this._setStatus('正在建立P2P通道...');
   }
 
   _makePC() {
     this._iceFailed = false;
+    this._iceStart = Date.now();
     this.pc = new RTCPeerConnection({
       iceServers: [
+        // STUN servers — hole-punching (China-accessible first)
         { urls: 'stun:stun.miwifi.com:3478' },
         { urls: 'stun:stun.qq.com:3478' },
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun.syncthing.net:3478' },
+        // Free TURN relay — fallback when P2P fails
+        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
       ],
       iceCandidatePoolSize: 2,
     });
 
     this.pc.oniceconnectionstatechange = () => {
       const s = this.pc.iceConnectionState;
-      if (s === 'failed' || s === 'disconnected') {
+      this._setStatus('ICE: ' + s);
+
+      if (s === 'checking') {
+        this._setStatus('正在尝试连接...');
+      } else if (s === 'connected' || s === 'completed') {
+        this._setStatus('网络已连接');
+      } else if (s === 'failed') {
+        this._iceFailed = true;
         if (this._state === 'signaling') {
-          this._iceFailed = true;
+          this._setStatus('连接失败，双方网络无法互通');
           this._state = 'disconnected';
           this._emit('peer_disconnected', {});
-        } else if (this._state === 'connected') {
+        }
+      } else if (s === 'disconnected') {
+        if (this._state === 'connected') {
           this._state = 'disconnected';
           this._emit('peer_disconnected', {});
         }
@@ -142,12 +176,12 @@ export class P2PClient {
 
     this.pc.onicegatheringstatechange = () => {
       if (this.pc.iceGatheringState === 'complete') {
-        // Check if we got any candidates
-        const localDesc = this.pc.localDescription;
-        if (localDesc && localDesc.sdp) {
-          const hasCand = localDesc.sdp.includes('a=candidate');
+        const ld = this.pc.localDescription;
+        if (ld && ld.sdp) {
+          const hasCand = ld.sdp.includes('a=candidate');
           if (!hasCand) {
             this._iceFailed = true;
+            this._setStatus('无法获取网络信息，请检查网络');
           }
         }
       }
@@ -157,29 +191,23 @@ export class P2PClient {
   _setupDataChannel() {
     this.dc.onopen = () => {
       this._state = 'connected';
-      // Quick connectivity check — send a ping
-      this.send('ping', {});
-      this._emit('*', { type: 'connected' });
+      this._setStatus('已连接');
     };
 
     this.dc.onmessage = (e) => {
       let msg;
       try { msg = JSON.parse(e.data); } catch { return; }
-      if (msg.type === 'ping') {
-        this.send('pong', {});
-      }
       this._emit(msg.type, msg);
       this._emit('*', msg);
     };
 
     this.dc.onclose = () => {
       this._state = 'disconnected';
+      this._setStatus('连接断开');
       this._emit('peer_disconnected', {});
     };
 
-    this.dc.onerror = () => {
-      // onclose will fire after this
-    };
+    this.dc.onerror = () => {};
   }
 
   _waitForIceComplete() {
@@ -199,13 +227,12 @@ export class P2PClient {
 
       setTimeout(() => {
         clearInterval(check);
-        // If still gathering after timeout, check for candidates
         const ld = this.pc.localDescription;
         if (ld && ld.sdp && !ld.sdp.includes('a=candidate')) {
           this._iceFailed = true;
         }
         resolve();
-      }, 5000);
+      }, 8000);
     });
   }
 
@@ -219,6 +246,7 @@ export class P2PClient {
     if (this.dc) { this.dc.close(); this.dc = null; }
     if (this.pc) { this.pc.close(); this.pc = null; }
     this._state = 'disconnected';
+    this._setStatus('');
   }
 
   send(type, data = {}) {
