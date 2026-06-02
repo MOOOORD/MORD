@@ -386,6 +386,7 @@ function initLobby() {
 function startMultiplayerGame(isHost, role) {
   isMultiplayerGame = true;
   network = lobby.getNetwork();
+  console.log('[START] isHost=', isHost, 'role=', role, 'network=', !!network);
 
   if (isHost) {
     // Multiplayer defaults to "蹲出生天" map
@@ -393,6 +394,7 @@ function startMultiplayerGame(isHost, role) {
     const mpData = DUN_BIRTH;
     game.init(mpType, gameModeSelection, mpData);
     game.initMultiplayer(mpType, gameModeSelection, mpData, role || PLAYER_ROLE.SURVIVOR, true, network);
+    console.log('[START] host init done, state=', game.state, 'isMulti=', game.isMultiplayer, 'localRole=', game.localRole);
     const mapJson = game.map.toJSON();
     network.send('game_event', { event: 'game_start', mapType: mpType, mode: gameModeSelection, mapData: mapJson, hostRole: role });
     showScreen('game-screen');
