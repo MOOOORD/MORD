@@ -1,0 +1,13 @@
+{
+  "type": "module",
+  "scripts": {
+    "server": "node start-server.js",
+    "server:tunnel": "node start-server.js --tunnel"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "localtunnel": "^2.0.2"
+  }
+}

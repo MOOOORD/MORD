@@ -11,7 +11,8 @@ const ctx = canvas.getContext('2d');
 canvas.width = CANVAS_WIDTH;
 canvas.height = CANVAS_HEIGHT;
 
-const SERVER_URL = 'ws://localhost:3000';
+const params = new URLSearchParams(window.location.search);
+const SERVER_URL = params.get('server') || 'ws://localhost:3000';
 
 const FIXED_DT = 1000 / 60;
 let game = new Game();
