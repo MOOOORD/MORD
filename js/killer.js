@@ -124,30 +124,31 @@ export class Killer {
     // Attack update (warning → hit/miss → wipe)
     this._updateAttack(player, gameMap);
 
-    // Carry state: move toward nearest hook
+    // Carry state: player-controlled movement, hook when near hook + press E
     if (this.state === KILLER_STATE.CARRY) {
-      if (this.carryTarget) {
-        const wx = this.carryTarget.x * TILE_SIZE + TILE_SIZE / 2;
-        const wy = this.carryTarget.y * TILE_SIZE + TILE_SIZE / 2;
-        const dx = wx - this.x;
-        const dy = wy - this.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 4) {
-          player.getHooked();
-          this.state = KILLER_STATE.PATROL;
-          this.speed = KILLER_SPEED;
-          this.carryTarget = null;
-        } else {
-          const speed = this.speed * dt * 60;
-          const newX = this.x + (dx / dist) * speed;
-          const newY = this.y + (dy / dist) * speed;
-          if (gameMap.isWalkable(newX, this.y, false)) this.x = newX;
-          if (gameMap.isWalkable(this.x, newY, false)) this.y = newY;
-          player.x = this.x;
-          player.y = this.y - 4;
+      // Hook survivor when near a hook and pressing E
+      if (keys['KeyE']) {
+        const tileCol = Math.floor(this.x / TILE_SIZE);
+        const tileRow = Math.floor(this.y / TILE_SIZE);
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            const r = tileRow + dr;
+            const c = tileCol + dc;
+            if (r < 0 || r >= gameMap.rows || c < 0 || c >= gameMap.cols) continue;
+            if (gameMap.grid[r][c] === 4) { // TILE.HOOK
+              player.getHooked();
+              this.state = KILLER_STATE.PATROL;
+              this.speed = KILLER_SPEED;
+              this.carryTarget = null;
+              return;
+            }
+          }
         }
       }
-      return;
+      // WASD movement while carrying (falls through to normal movement below)
+      // Player follows killer
+      player.x = this.x;
+      player.y = this.y - 4;
     }
 
     // WASD movement (blocked during attack animation)
@@ -181,8 +182,8 @@ export class Killer {
       // Interact trigger (E) — pick up downed player or break pallet
       if (keys['KeyE']) {
         const distToPlayer = this._dist(player.x, player.y);
-        // Pick up downed player
-        if (player.health === PLAYER_HEALTH.DOWNED && distToPlayer < 32) {
+        // Pick up downed player (only if not already carrying)
+        if (this.state !== KILLER_STATE.CARRY && player.health === PLAYER_HEALTH.DOWNED && distToPlayer < 32) {
           this.state = KILLER_STATE.CARRY;
           this.speed = KILLER_SPEED * 0.95;
           this._findNearestHook(gameMap);
