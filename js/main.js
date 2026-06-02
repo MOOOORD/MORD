@@ -134,6 +134,95 @@ function drawAvatars() {
   drawAvatar('avatar-killer', KILLER_SPRITE, '#1a0a0a');
 }
 
+function drawCatAvatar() {
+  const c = document.getElementById('cat-avatar');
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  const s = 4; // 14x14 sprite at 4x scale = 56x56
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(0, 0, 56, 56);
+
+  // Cat ears (top)
+  ctx.fillStyle = '#ffccaa';
+  ctx.fillRect(2*s, 0, 2*s, 2*s);      // left ear inner
+  ctx.fillRect(10*s, 0, 2*s, 2*s);     // right ear inner
+  ctx.fillStyle = '#e8a080';
+  ctx.fillRect(3*s, 1*s, 1*s, 1*s);    // left ear shadow
+  ctx.fillRect(10*s, 1*s, 1*s, 1*s);   // right ear shadow
+  // Ear triangles
+  ctx.fillStyle = '#333';
+  ctx.fillRect(1*s, 1*s, 1*s, 1*s);
+  ctx.fillRect(12*s, 1*s, 1*s, 1*s);
+
+  // Hair
+  ctx.fillStyle = '#4a3040';
+  ctx.fillRect(1*s, 2*s, 12*s, 1*s);
+  ctx.fillRect(0, 3*s, 14*s, 1*s);
+
+  // Face
+  ctx.fillStyle = '#ffccaa';
+  ctx.fillRect(2*s, 4*s, 10*s, 5*s);
+
+  // Eyes (big cute)
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(3*s, 5*s, 3*s, 3*s);    // left eye white
+  ctx.fillRect(8*s, 5*s, 3*s, 3*s);    // right eye white
+  ctx.fillStyle = '#4a90d9';
+  ctx.fillRect(4*s, 6*s, 2*s, 2*s);    // left iris
+  ctx.fillRect(9*s, 6*s, 2*s, 2*s);    // right iris
+  ctx.fillStyle = '#111';
+  ctx.fillRect(5*s, 6*s, 1*s, 1*s);    // left pupil
+  ctx.fillRect(10*s, 6*s, 1*s, 1*s);   // right pupil
+  // Eye shine
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(5*s, 5*s, 1*s, 1*s);
+  ctx.fillRect(10*s, 5*s, 1*s, 1*s);
+
+  // Blush
+  ctx.fillStyle = 'rgba(255, 150, 150, 0.5)';
+  ctx.fillRect(2*s, 7*s, 2*s, 1*s);
+  ctx.fillRect(10*s, 7*s, 2*s, 1*s);
+
+  // Mouth (tiny cat mouth)
+  ctx.fillStyle = '#cc6655';
+  ctx.fillRect(6*s, 8*s, 2*s, 1*s);
+  ctx.fillRect(5*s, 8*s, 1*s, 1*s);
+
+  // Chin
+  ctx.fillStyle = '#ffccaa';
+  ctx.fillRect(4*s, 9*s, 6*s, 1*s);
+
+  // Body / collar
+  ctx.fillStyle = '#e94560';
+  ctx.fillRect(3*s, 10*s, 8*s, 1*s);
+  // Bell
+  ctx.fillStyle = '#f0c040';
+  ctx.fillRect(6*s, 10*s, 2*s, 1*s);
+
+  // Body
+  ctx.fillStyle = '#4a3040';
+  ctx.fillRect(3*s, 11*s, 8*s, 3*s);
+
+  // Paws
+  ctx.fillStyle = '#ffccaa';
+  ctx.fillRect(3*s, 13*s, 2*s, 1*s);
+  ctx.fillRect(9*s, 13*s, 2*s, 1*s);
+}
+
+function setupCatTooltip() {
+  const avatar = document.getElementById('cat-avatar');
+  const tooltip = document.getElementById('cat-tooltip');
+  if (!avatar || !tooltip) return;
+
+  avatar.addEventListener('click', (e) => {
+    e.stopPropagation();
+    tooltip.classList.toggle('show');
+    if (tooltip.classList.contains('show')) {
+      setTimeout(() => tooltip.classList.remove('show'), 2500);
+    }
+  });
+}
+
 function buildMenu() {
   menuButtons.innerHTML = '';
   setTimeout(drawAvatars, 10);
@@ -335,6 +424,8 @@ function gameLoop(timestamp) {
 showScreen('menu-screen');
 buildMenu();
 drawAvatars();
+drawCatAvatar();
+setupCatTooltip();
 requestAnimationFrame(gameLoop);
 
 export { canvas, ctx };

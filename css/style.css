@@ -27,7 +27,45 @@ body { background: #0a0a0a; color: #e0e0e0; font-family: 'Press Start 2P', monos
   text-shadow: 0 0 18px rgba(240, 192, 64, 0.8);
 }
 
-/* --- Animated Title --- */
+/* --- Cat Avatar --- */
+#cat-avatar {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 56px;
+  height: 56px;
+  image-rendering: pixelated;
+  border: 2px solid #e94560;
+  border-radius: 4px;
+  cursor: pointer;
+  z-index: 200;
+  transition: transform 0.15s, box-shadow 0.15s;
+  background: #1a1a2e;
+}
+#cat-avatar:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 16px rgba(233, 69, 96, 0.5);
+}
+
+#cat-tooltip {
+  position: fixed;
+  top: 20px;
+  right: 80px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  color: #e94560;
+  background: #1a1a2e;
+  border: 2px solid #e94560;
+  padding: 8px 14px;
+  z-index: 201;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  white-space: nowrap;
+}
+#cat-tooltip.show {
+  opacity: 1;
+}
 .pixel-title {
   font-size: 64px;
   letter-spacing: 8px;
