@@ -19,6 +19,33 @@ let mapTypeSelection = MAP_TYPE.HYBRID;
 let customMapData = null;
 let editor = null;
 
+const QUOTES = [
+  '这喷不了这是真处！',
+  '以后会加入ai队友，这样就可以一个架前面一个架后面。',
+  '感觉阴沟不是很友善啊！',
+  '我就是为了装逼才做的这个。',
+  '我说假如加入江神她一定是空军有没有懂的。',
+  '如果你想在这里有其他的什么内容可以给我投稿！',
+];
+
+let quoteInterval = null;
+
+function startQuoteRotation() {
+  const bar = document.getElementById('quote-bar');
+  if (!bar) return;
+  const pick = () => {
+    const q = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+    bar.style.opacity = '0';
+    setTimeout(() => {
+      bar.textContent = q;
+      bar.style.opacity = '0.9';
+    }, 500);
+  };
+  pick();
+  if (quoteInterval) clearInterval(quoteInterval);
+  quoteInterval = setInterval(pick, 10000);
+}
+
 const menuScreen = document.getElementById('menu-screen');
 const gameScreen = document.getElementById('game-screen');
 const resultScreen = document.getElementById('result-screen');
@@ -200,6 +227,7 @@ function initEditor() {
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
+  if (id === 'menu-screen') startQuoteRotation();
 }
 
 function showResult() {
