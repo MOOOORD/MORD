@@ -28,7 +28,13 @@ export class P2PClient {
     }
 
     this._state = 'signaling';
-    return btoa(JSON.stringify(this.pc.localDescription));
+
+    // Validate: local description must be type "offer"
+    const ld = this.pc.localDescription;
+    if (!ld || ld.type !== 'offer') {
+      throw new Error('生成连接失败，请刷新重试');
+    }
+    return btoa(encodeURIComponent(JSON.stringify(ld)));
   }
 
   async acceptOffer(offerB64) {
@@ -39,11 +45,22 @@ export class P2PClient {
       this._setupDataChannel();
     };
 
-    let desc;
+    let raw;
     try {
-      desc = JSON.parse(atob(offerB64));
+      raw = decodeURIComponent(atob(offerB64));
     } catch {
       throw new Error('连接码格式无效，请检查是否完整复制');
+    }
+
+    let desc;
+    try {
+      desc = JSON.parse(raw);
+    } catch {
+      throw new Error('连接码格式无效，请检查是否完整复制');
+    }
+
+    if (desc.type !== 'offer') {
+      throw new Error('连接码类型错误，请确认复制的是"连接码"而非"回应码"');
     }
 
     await this.pc.setRemoteDescription(new RTCSessionDescription(desc));
@@ -57,16 +74,42 @@ export class P2PClient {
     }
 
     this._state = 'signaling';
-    return btoa(JSON.stringify(this.pc.localDescription));
+
+    const ld = this.pc.localDescription;
+    if (!ld || ld.type !== 'answer') {
+      throw new Error('生成回应失败，请刷新重试');
+    }
+    return btoa(encodeURIComponent(JSON.stringify(ld)));
   }
 
   async setAnswer(answerB64) {
-    let desc;
+    let raw;
     try {
-      desc = JSON.parse(atob(answerB64));
+      raw = decodeURIComponent(atob(answerB64));
     } catch {
       throw new Error('回应码格式无效，请检查是否完整复制');
     }
+
+    let desc;
+    try {
+      desc = JSON.parse(raw);
+    } catch {
+      throw new Error('回应码格式无效，请检查是否完整复制');
+    }
+
+    if (desc.type !== 'answer') {
+      throw new Error('回应码类型错误，请确认复制的是"回应码"而非"连接码"');
+    }
+
+    // Verify correct signaling state
+    const st = this.pc.signalingState;
+    if (st !== 'have-local-offer') {
+      throw new Error(
+        st === 'stable'
+          ? '连接状态异常，请重新创建房间'
+          : '连接状态异常(' + st + ')，请重试');
+    }
+
     await this.pc.setRemoteDescription(new RTCSessionDescription(desc));
   }
 
