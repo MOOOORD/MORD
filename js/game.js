@@ -107,7 +107,7 @@ export class Game {
       g: this.map.generators.map(g => [g.x, g.y, g.repaired ? 1 : 0, g.phase || 0, g.repairProgress || 0]),
       d: this.map.exitGates.map(g => [g.x, g.y, g.open ? 1 : 0, g.powered ? 1 : 0]),
       l: this.map.pallets.map(p => [p.x, p.y, p.dropped ? 1 : 0, p.broken ? 1 : 0]),
-      w: Object.fromEntries(this.objectives.windowCooldowns),
+      w: { ...this.objectives.windowCooldowns },
       fp: this.footprints.slice(-60).map(f => [f.x, f.y, f.time]),
       m: [this.mode === GAME_MODE.ESCAPE ? 0 : 1, this.score, this.scoreTimer,
         this.gensRepaired, this.powerFlash, this.survivalTime],
@@ -183,10 +183,8 @@ export class Game {
 
     // Window cooldowns
     if (s.w) {
-      this.objectives.windowCooldowns.clear();
-      for (const [k, v] of Object.entries(s.w)) {
-        this.objectives.windowCooldowns.set(k, v);
-      }
+      this.objectives.windowCooldowns = {};
+      Object.assign(this.objectives.windowCooldowns, s.w);
     }
 
     // Footprints
