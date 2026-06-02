@@ -101,7 +101,7 @@ export class Game {
         k.x, k.y, KSTATE_REV[k.state], k.stunTimer,
         APHASE_REV[k.attackPhase], k.attackTimer, k.attackHit ? 1 : 0, k.windowSlowTimer,
       ],
-      g: this.map.generators.map(g => [g.x, g.y, g.repaired ? 1 : 0, g.phase || 0]),
+      g: this.map.generators.map(g => [g.x, g.y, g.repaired ? 1 : 0, g.phase || 0, g.repairProgress || 0]),
       d: this.map.exitGates.map(g => [g.x, g.y, g.open ? 1 : 0, g.powered ? 1 : 0]),
       l: this.map.pallets.map(p => [p.x, p.y, p.dropped ? 1 : 0, p.broken ? 1 : 0]),
       w: Object.fromEntries(this.objectives.windowCooldowns),
@@ -142,12 +142,13 @@ export class Game {
 
     // Generators
     for (let i = 0; i < s.g.length; i++) {
-      const [gx, gy, repaired, phase] = s.g[i];
+      const [gx, gy, repaired, phase, repairProgress] = s.g[i];
       if (i < this.map.generators.length) {
         const gen = this.map.generators[i];
         if (gen.x === gx && gen.y === gy) {
           gen.repaired = !!repaired;
           gen.phase = phase || 0;
+          gen.repairProgress = repairProgress || 0;
         }
       }
     }
@@ -237,9 +238,9 @@ export class Game {
     if (playerKeys['KeyE']) {
       const genTarget = this.objectives.getNearbyInteractable(this.player.x, this.player.y, ['generator']);
       if (genTarget) {
-        this.player.interactProgress++;
+        genTarget.obj.repairProgress = (genTarget.obj.repairProgress || 0) + 1;
         this.player.interacting = true;
-        const result = this.objectives.interact(genTarget, this.player.interactProgress, this.killer, this.player);
+        const result = this.objectives.interact(genTarget, genTarget.obj.repairProgress, this.killer, this.player);
         if (result) {
           if (result.done) {
             this.player.interactProgress = 0;

@@ -204,6 +204,20 @@ export class ObjectivesManager {
           ctx.fillStyle = '#fff';
           ctx.fillRect(sx - 2, sy - 18, 4, 5); // spark above generator
         }
+
+        // Repair progress bar (only show if started repairing)
+        const rp = gen.repairProgress || 0;
+        if (rp > 0) {
+          const barW = 20;
+          const barH = 4;
+          const barX = sx - barW / 2;
+          const barY = sy + 12;
+          const pct = Math.min(1, rp / REPAIR_TIME);
+          ctx.fillStyle = '#333';
+          ctx.fillRect(barX, barY, barW, barH);
+          ctx.fillStyle = '#4ecca3';
+          ctx.fillRect(barX, barY, barW * pct, barH);
+        }
       }
     }
 

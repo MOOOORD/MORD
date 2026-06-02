@@ -205,7 +205,7 @@ export class GameMap {
     this._shuffle(candidates);
     this.generators = candidates.slice(0, 5).map(({ r, c }) => {
       this.grid[r][c] = TILE.GENERATOR;
-      return { x: c, y: r, repaired: false };
+      return { x: c, y: r, repaired: false, repairProgress: 0 };
     });
   }
 
@@ -359,7 +359,7 @@ export class GameMap {
       for (let c = 0; c < this.cols; c++) {
         switch (this.grid[r][c]) {
           case TILE.GENERATOR:
-            this.generators.push({ x: c, y: r, repaired: false });
+            this.generators.push({ x: c, y: r, repaired: false, repairProgress: 0 });
             break;
           case TILE.HOOK:
             this.hooks.push({ x: c, y: r });

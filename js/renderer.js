@@ -190,6 +190,29 @@ export class Renderer {
       ctx.textAlign = 'start';
     }
 
+    // Generator repair progress bar (bottom of screen)
+    const nearGen = game.objectives
+      ? game.objectives.getNearbyInteractable(player.x, player.y, ['generator'])
+      : null;
+    if (nearGen && (nearGen.obj.repairProgress || 0) > 0) {
+      const barW = 280, barH = 14;
+      const bx = CANVAS_WIDTH / 2 - barW / 2;
+      const by = CANVAS_HEIGHT - 32;
+      const pct = Math.min(1, (nearGen.obj.repairProgress || 0) / REPAIR_TIME);
+      ctx.fillStyle = '#222';
+      ctx.fillRect(bx, by, barW, barH);
+      ctx.fillStyle = '#f0c040';
+      ctx.fillRect(bx, by, barW * pct, barH);
+      ctx.strokeStyle = '#888';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx, by, barW, barH);
+      ctx.font = '13px monospace';
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.fillText(`修理中... ${Math.floor(pct * 100)}%`, CANVAS_WIDTH / 2, by - 4);
+      ctx.textAlign = 'start';
+    }
+
     if (player.health === PLAYER_HEALTH.HOOKED) {
       ctx.font = '26px "Press Start 2P", monospace';
       ctx.fillStyle = '#e94560';
