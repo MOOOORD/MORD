@@ -89,6 +89,133 @@ export class Killer {
     this._lastTile = curTile;
   }
 
+  // Player-controlled update — replaces AI with keyboard input.
+  // Called instead of update() when a human player controls the killer.
+  updatePlayerControlled(dt, keys, player, gameMap) {
+    if (this.stunTimer > 0) {
+      this.stunTimer--;
+      this.attackPhase = 'idle';
+      this.attackTimer = 0;
+      return;
+    }
+
+    // Pallet break animation
+    if (this.state === KILLER_STATE.BREAK) {
+      this.breakTimer--;
+      if (this.breakTimer <= 0) {
+        if (this.breakTarget && this.breakTarget.dropped && !this.breakTarget.broken) {
+          this.breakTarget.broken = true;
+        }
+        this.breakTarget = null;
+        this.state = this.preBreakState || KILLER_STATE.PATROL;
+        this.speed = KILLER_SPEED;
+        this.preBreakState = null;
+      }
+      return;
+    }
+
+    // Attack update (warning → hit/miss → wipe)
+    this._updateAttack(player, gameMap);
+
+    // Carry state: move toward nearest hook
+    if (this.state === KILLER_STATE.CARRY) {
+      if (this.carryTarget) {
+        const wx = this.carryTarget.x * TILE_SIZE + TILE_SIZE / 2;
+        const wy = this.carryTarget.y * TILE_SIZE + TILE_SIZE / 2;
+        const dx = wx - this.x;
+        const dy = wy - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 4) {
+          player.getHooked();
+          this.state = KILLER_STATE.PATROL;
+          this.speed = KILLER_SPEED;
+          this.carryTarget = null;
+        } else {
+          const speed = this.speed * dt * 60;
+          const newX = this.x + (dx / dist) * speed;
+          const newY = this.y + (dy / dist) * speed;
+          if (gameMap.isWalkable(newX, this.y, false)) this.x = newX;
+          if (gameMap.isWalkable(this.x, newY, false)) this.y = newY;
+          player.x = this.x;
+          player.y = this.y - 4;
+        }
+      }
+      return;
+    }
+
+    // WASD movement (blocked during attack animation)
+    if (this.attackPhase === 'idle') {
+      let mx = 0, my = 0;
+      if (keys['KeyW'] || keys['ArrowUp']) my -= 1;
+      if (keys['KeyS'] || keys['ArrowDown']) my += 1;
+      if (keys['KeyA'] || keys['ArrowLeft']) mx -= 1;
+      if (keys['KeyD'] || keys['ArrowRight']) mx += 1;
+
+      if (mx !== 0 && my !== 0) { mx *= 0.707; my *= 0.707; }
+
+      let moveMult = 1;
+      if (this.windowSlowTimer > 0) moveMult = 0.4;
+
+      const speed = this.speed * dt * 60 * moveMult;
+      const newX = this.x + mx * speed;
+      const newY = this.y + my * speed;
+
+      if (gameMap.isWalkable(newX, this.y, false)) this.x = newX;
+      if (gameMap.isWalkable(this.x, newY, false)) this.y = newY;
+
+      // Attack trigger (Space)
+      if (keys['Space'] && this.attackPhase === 'idle') {
+        const dist = this._dist(player.x, player.y);
+        if (dist < 32) {
+          this._attack(player);
+        }
+      }
+
+      // Interact trigger (E) — pick up downed player or break pallet
+      if (keys['KeyE']) {
+        const distToPlayer = this._dist(player.x, player.y);
+        // Pick up downed player
+        if (player.health === PLAYER_HEALTH.DOWNED && distToPlayer < 32) {
+          this.state = KILLER_STATE.CARRY;
+          this.speed = KILLER_SPEED * 0.95;
+          this._findNearestHook(gameMap);
+        }
+        // Break nearby pallet
+        const tileCol = Math.floor(this.x / TILE_SIZE);
+        const tileRow = Math.floor(this.y / TILE_SIZE);
+        const pallet = gameMap.pallets.find(p =>
+          p.x === tileCol && p.y === tileRow && p.dropped && !p.broken
+        );
+        if (pallet) {
+          this.preBreakState = this.state;
+          this.state = KILLER_STATE.BREAK;
+          this.breakTimer = KILLER_BREAK_TIME;
+          this.breakTarget = pallet;
+        }
+      }
+    }
+
+    // Stuck detection
+    const moved = Math.hypot(this.x - this.lastPos.x, this.y - this.lastPos.y);
+    if (moved < 8) {
+      this.stuckFrames++;
+      if (this.stuckFrames > 90) {
+        this._tryUnstuck(gameMap);
+        this.stuckFrames = 0;
+      }
+    } else {
+      this.stuckFrames = 0;
+    }
+    this.lastPos = { x: this.x, y: this.y };
+
+    if (this.windowSlowTimer > 0) this.windowSlowTimer--;
+    const curTile = gameMap.getTile(this.x, this.y);
+    if (curTile === TILE.WINDOW && this._lastTile !== TILE.WINDOW) {
+      this.windowSlowTimer = 25;
+    }
+    this._lastTile = curTile;
+  }
+
   _updateAttack(player, gameMap) {
     if (this.attackPhase === 'idle') return;
     this.attackTimer--;

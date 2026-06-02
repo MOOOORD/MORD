@@ -1,9 +1,16 @@
 // game.js
-import { STATE, GAME_MODE, PLAYER_HEALTH, SCORE_MODE_TIME, KILLER_SPEED, REPAIR_DECAY_RATE, REPAIR_DECAY_FAST } from './constants.js';
+import { STATE, GAME_MODE, PLAYER_HEALTH, SCORE_MODE_TIME, KILLER_SPEED, KILLER_STATE, REPAIR_DECAY_RATE, REPAIR_DECAY_FAST, NETWORK_STATE_RATE, NETWORK_INPUT_RATE, PLAYER_ROLE } from './constants.js';
 import { GameMap } from './map.js';
 import { Player } from './player.js';
 import { Killer } from './killer.js';
 import { ObjectivesManager } from './objectives.js';
+
+const HEALTH_MAP = { 0: 'healthy', 1: 'injured', 2: 'downed', 3: 'hooked', 4: 'dead' };
+const HEALTH_REV = { healthy: 0, injured: 1, downed: 2, hooked: 3, dead: 4 };
+const KSTATE_MAP = { 0: 'patrol', 1: 'alert', 2: 'chase', 3: 'carry', 4: 'break' };
+const KSTATE_REV = { patrol: 0, alert: 1, chase: 2, carry: 3, break: 4 };
+const APHASE_MAP = { 0: 'idle', 1: 'warning', 2: 'wipe' };
+const APHASE_REV = { idle: 0, warning: 1, wipe: 2 };
 
 export class Game {
   constructor() {
@@ -20,11 +27,19 @@ export class Game {
     this.gensRepaired = 0;
     this.resultTitle = '';
     this.resultDetail = '';
-    this.resultType = '';   // 'escape' | 'dead' | 'timeout'
+    this.resultType = '';
     this.keys = {};
     this.pulseFrame = 0;
     this.gatesJustPowered = false;
     this.powerFlash = 0;
+    // Multiplayer
+    this.isMultiplayer = false;
+    this.localRole = null;
+    this.isHost = false;
+    this.network = null;
+    this.remoteKeys = {};
+    this.lastStateSend = 0;
+    this.lastInputSeq = -1;
   }
 
   init(mapType, mode, mapData = null) {
@@ -44,17 +59,192 @@ export class Game {
     this.state = STATE.PLAYING;
   }
 
+  initMultiplayer(mapType, mode, mapData, localRole, isHost, network) {
+    this.init(mapType, mode, mapData);
+    this.isMultiplayer = true;
+    this.localRole = localRole;
+    this.isHost = isHost;
+    this.network = network;
+    this.lastStateSend = 0;
+
+    if (isHost) {
+      this.network.on('player_input', (msg) => {
+        this.remoteKeys = msg.keys || {};
+      });
+    } else {
+      this.network.on('state_sync', (msg) => {
+        this._receiveState(msg);
+      });
+      this.network.on('game_event', (msg) => {
+        if (msg.event === 'paused') { this.state = STATE.PAUSED; }
+        else if (msg.event === 'resumed') { this.state = STATE.PLAYING; }
+        else if (msg.event === 'result') {
+          this.state = STATE.RESULT;
+          this.resultType = msg.resultType;
+          this.resultTitle = msg.resultTitle;
+          this.resultDetail = msg.resultDetail;
+        }
+      });
+    }
+  }
+
+  _serializeState() {
+    const p = this.player;
+    const k = this.killer;
+    return {
+      p: [
+        p.x, p.y, HEALTH_REV[p.health], p.stamina,
+        p.hookCount, p.hookTimer, p.invincibleTimer, p.hitBoostTimer,
+        p.facingDir.x, p.facingDir.y, p.interacting ? 1 : 0, p.interactProgress,
+      ],
+      k: [
+        k.x, k.y, KSTATE_REV[k.state], k.stunTimer,
+        APHASE_REV[k.attackPhase], k.attackTimer, k.attackHit ? 1 : 0, k.windowSlowTimer,
+      ],
+      g: this.map.generators.map(g => [g.x, g.y, g.repaired ? 1 : 0, g.phase || 0]),
+      d: this.map.exitGates.map(g => [g.x, g.y, g.open ? 1 : 0, g.powered ? 1 : 0]),
+      l: this.map.pallets.map(p => [p.x, p.y, p.dropped ? 1 : 0, p.broken ? 1 : 0]),
+      w: Object.fromEntries(this.objectives.windowCooldowns),
+      m: [this.mode === GAME_MODE.ESCAPE ? 0 : 1, this.score, this.scoreTimer,
+        this.gensRepaired, this.powerFlash, this.survivalTime],
+      seq: ++this.lastInputSeq,
+    };
+  }
+
+  _receiveState(data) {
+    const s = data;
+    if (!s || !s.p || !s.k) return;
+
+    // Player state
+    this.player.x = s.p[0];
+    this.player.y = s.p[1];
+    this.player.health = HEALTH_MAP[s.p[2]] || PLAYER_HEALTH.HEALTHY;
+    this.player.stamina = s.p[3];
+    this.player.hookCount = s.p[4];
+    this.player.hookTimer = s.p[5];
+    this.player.invincibleTimer = s.p[6];
+    this.player.hitBoostTimer = s.p[7];
+    this.player.facingDir = { x: s.p[8], y: s.p[9] };
+    this.player.interacting = !!s.p[10];
+    this.player.interactProgress = s.p[11];
+
+    // Killer state
+    this.killer.x = s.k[0];
+    this.killer.y = s.k[1];
+    this.killer.state = KSTATE_MAP[s.k[2]] || KILLER_STATE.PATROL;
+    this.killer.stunTimer = s.k[3];
+    this.killer.attackPhase = APHASE_MAP[s.k[4]] || 'idle';
+    this.killer.attackTimer = s.k[5];
+    this.killer.attackHit = !!s.k[6];
+    this.killer.windowSlowTimer = s.k[7];
+
+    // Generators
+    for (let i = 0; i < s.g.length; i++) {
+      const [gx, gy, repaired, phase] = s.g[i];
+      if (i < this.map.generators.length) {
+        const gen = this.map.generators[i];
+        if (gen.x === gx && gen.y === gy) {
+          gen.repaired = !!repaired;
+          gen.phase = phase || 0;
+        }
+      }
+    }
+
+    // Gates
+    for (let i = 0; i < s.d.length; i++) {
+      const [dx, dy, open, powered] = s.d[i];
+      if (i < this.map.exitGates.length) {
+        const gate = this.map.exitGates[i];
+        if (gate.x === dx && gate.y === dy) {
+          gate.open = !!open;
+          gate.powered = !!powered;
+        }
+      }
+    }
+
+    // Pallets
+    for (let i = 0; i < s.l.length; i++) {
+      const [lx, ly, dropped, broken] = s.l[i];
+      if (i < this.map.pallets.length) {
+        const pal = this.map.pallets[i];
+        if (pal.x === lx && pal.y === ly) {
+          pal.dropped = !!dropped;
+          pal.broken = !!broken;
+        }
+      }
+    }
+
+    // Window cooldowns
+    if (s.w) {
+      this.objectives.windowCooldowns.clear();
+      for (const [k, v] of Object.entries(s.w)) {
+        this.objectives.windowCooldowns.set(k, v);
+      }
+    }
+
+    // Game state
+    if (s.m) {
+      this.mode = s.m[0] === 0 ? GAME_MODE.ESCAPE : GAME_MODE.SCORE;
+      this.score = s.m[1];
+      this.scoreTimer = s.m[2];
+      this.gensRepaired = s.m[3];
+      this.powerFlash = s.m[4];
+      this.survivalTime = s.m[5];
+    }
+  }
+
+  _sendState() {
+    if (!this.network || !this.isHost) return;
+    this.network.send('state_sync', this._serializeState());
+  }
+
+  _sendEvent(event, extra = {}) {
+    if (!this.network || !this.isHost) return;
+    this.network.send('game_event', { event, ...extra });
+  }
+
+  _sendInput() {
+    if (!this.network || this.isHost) return;
+    this.network.send('player_input', { keys: { ...this.keys } });
+  }
+
   update(dt) {
     if (this.state !== STATE.PLAYING) return;
+
+    // --- Client: send input, apply local prediction, no simulation ---
+    if (this.isMultiplayer && !this.isHost) {
+      this.lastStateSend += dt * 1000;
+      if (this.lastStateSend >= NETWORK_INPUT_RATE) {
+        this._sendInput();
+        // Reset accumulated time (keep remainder)
+        while (this.lastStateSend >= NETWORK_INPUT_RATE) this.lastStateSend -= NETWORK_INPUT_RATE;
+      }
+      // Local input prediction: move own character based on keys
+      const myEntity = this.localRole === PLAYER_ROLE.SURVIVOR ? this.player : this.killer;
+      if (myEntity === this.player) {
+        myEntity.update(dt, this.keys, this.map);
+      } else {
+        this.killer.updatePlayerControlled(dt, this.keys, this.player, this.map);
+      }
+      return;
+    }
+
+    // --- Host / single-player: full simulation ---
     this.pulseFrame++;
     this.survivalTime += dt;
     if (this.powerFlash > 0) this.powerFlash--;
     this.objectives.update();
 
-    this.player.update(dt, this.keys, this.map);
+    // Determine which keys control which entity
+    const playerKeys = (this.isMultiplayer && this.localRole === PLAYER_ROLE.KILLER)
+      ? this.remoteKeys : this.keys;
+    const killerKeys = (this.isMultiplayer && this.localRole === PLAYER_ROLE.SURVIVOR)
+      ? this.remoteKeys : this.keys;
 
-    // E key — repair generators
-    if (this.keys['KeyE']) {
+    this.player.update(dt, playerKeys, this.map);
+
+    // E key — repair generators (survivor only)
+    if (playerKeys['KeyE']) {
       const genTarget = this.objectives.getNearbyInteractable(this.player.x, this.player.y, ['generator']);
       if (genTarget) {
         this.player.interactProgress++;
@@ -74,7 +264,9 @@ export class Game {
             }
           } else {
             if (result.event === 'phase_alert') {
-              this._alertKillerToPlayer();
+              if (!this.isMultiplayer || this.localRole !== PLAYER_ROLE.KILLER) {
+                this._alertKillerToPlayer();
+              }
             } else if (result.spark) {
               if (this.killer.state === 'patrol') {
                 this.killer.state = 'alert';
@@ -88,8 +280,8 @@ export class Game {
         this.player.interactProgress = Math.max(0, this.player.interactProgress - REPAIR_DECAY_FAST);
         this.player.interacting = false;
       }
-    } else if (this.keys['Space']) {
-      // Space — vault windows, drop pallets, open gates, struggle on hook
+    } else if (playerKeys['Space']) {
+      // Space — vault windows, drop pallets, open gates
       if (this.player.health !== PLAYER_HEALTH.HOOKED) {
         const interactable = this.objectives.getNearbyInteractable(this.player.x, this.player.y, ['window', 'pallet', 'exit_gate']);
         if (interactable) {
@@ -115,11 +307,16 @@ export class Game {
       this.player.interacting = false;
     }
 
-    this.killer.update(dt, this.player, this.map);
+    // Killer update: AI or human-controlled
+    if (this.isMultiplayer && this.localRole === PLAYER_ROLE.SURVIVOR) {
+      this.killer.updatePlayerControlled(dt, killerKeys, this.player, this.map);
+    } else {
+      this.killer.update(dt, this.player, this.map);
+    }
 
     if (this.mode === GAME_MODE.SCORE) {
       this.scoreTimer -= dt;
-      if (this.keys['KeyE']) {
+      if (playerKeys['KeyE']) {
         const ia = this.objectives.getNearbyInteractable(this.player.x, this.player.y, ['generator']);
         if (ia) this.score += 20 * dt;
       }
@@ -145,6 +342,15 @@ export class Game {
     }
 
     this._checkEndConditions();
+
+    // Send state to client periodically
+    if (this.isMultiplayer && this.isHost) {
+      this.lastStateSend += dt * 1000;
+      while (this.lastStateSend >= NETWORK_STATE_RATE) {
+        this._sendState();
+        this.lastStateSend -= NETWORK_STATE_RATE;
+      }
+    }
   }
 
   _checkEndConditions() {
@@ -154,40 +360,33 @@ export class Game {
     const timeSec = Math.floor(this.survivalTime);
     const timeStr = `${Math.floor(timeSec / 60)}分${timeSec % 60}秒`;
 
-    if (this.mode === GAME_MODE.ESCAPE && this.objectives.checkEscape(this.player)) {
+    const setResult = (type, title, health) => {
       this.state = STATE.RESULT;
-      this.resultType = 'escape';
-      this.resultTitle = '逃脱成功！';
+      this.resultType = type;
+      this.resultTitle = title;
       this.resultDetail = JSON.stringify({
         mode: modeLabel, map: mapName, time: timeStr,
         gens: this.gensRepaired, score: Math.floor(this.score),
-        health: '幸存',
+        health,
       });
+      if (this.isMultiplayer && this.isHost) {
+        this._sendEvent('result', { resultType: type, resultTitle: title, resultDetail: this.resultDetail });
+      }
+    };
+
+    if (this.mode === GAME_MODE.ESCAPE && this.objectives.checkEscape(this.player)) {
+      setResult('escape', '逃脱成功！', '幸存');
       return;
     }
 
     if (this.player.health === PLAYER_HEALTH.DEAD || this.player.hookCount >= 3) {
-      this.state = STATE.RESULT;
-      this.resultType = 'dead';
-      this.resultTitle = '被淘汰';
       const cause = this.player.hookCount >= 3 ? '挂上钩子三次' : '伤势过重';
-      this.resultDetail = JSON.stringify({
-        mode: modeLabel, map: mapName, time: timeStr,
-        gens: this.gensRepaired, score: Math.floor(this.score),
-        health: cause,
-      });
+      setResult('dead', '被淘汰', cause);
       return;
     }
 
     if (this.mode === GAME_MODE.SCORE && this.scoreTimer <= 0) {
-      this.state = STATE.RESULT;
-      this.resultType = 'timeout';
-      this.resultTitle = '时间到！';
-      this.resultDetail = JSON.stringify({
-        mode: modeLabel, map: mapName, time: timeStr,
-        gens: this.gensRepaired, score: Math.floor(this.score),
-        health: '存活',
-      });
+      setResult('timeout', '时间到！', '存活');
     }
   }
 
@@ -217,8 +416,10 @@ export class Game {
   togglePause() {
     if (this.state === STATE.PLAYING) {
       this.state = STATE.PAUSED;
+      if (this.isMultiplayer && this.isHost) this._sendEvent('paused');
     } else if (this.state === STATE.PAUSED) {
       this.state = STATE.PLAYING;
+      if (this.isMultiplayer && this.isHost) this._sendEvent('resumed');
     }
   }
 }

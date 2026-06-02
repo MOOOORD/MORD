@@ -1,13 +1,17 @@
 // main.js
-import { CANVAS_WIDTH, CANVAS_HEIGHT, STATE, GAME_MODE, MAP_TYPE } from './constants.js';
+import { CANVAS_WIDTH, CANVAS_HEIGHT, STATE, GAME_MODE, MAP_TYPE, PLAYER_ROLE } from './constants.js';
 import { Game } from './game.js';
 import { Renderer } from './renderer.js';
 import { MapEditor } from './editor.js';
+import { NetworkClient } from './network.js';
+import { Lobby } from './lobby.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 canvas.width = CANVAS_WIDTH;
 canvas.height = CANVAS_HEIGHT;
+
+const SERVER_URL = 'ws://localhost:3000';
 
 const FIXED_DT = 1000 / 60;
 let game = new Game();
@@ -18,6 +22,11 @@ let gameModeSelection = GAME_MODE.ESCAPE;
 let mapTypeSelection = MAP_TYPE.HYBRID;
 let customMapData = null;
 let editor = null;
+
+// Multiplayer
+let network = null;
+let lobby = null;
+let isMultiplayerGame = false;
 
 const QUOTES = [
   '这喷不了这是真处！',
@@ -273,6 +282,15 @@ function buildMenu() {
   btnTutorial.onclick = () => showScreen('tutorial-screen');
   menuButtons.appendChild(btnTutorial);
 
+  const btnMultiplayer = document.createElement('button');
+  btnMultiplayer.className = 'pixel-btn';
+  btnMultiplayer.textContent = '双人对战';
+  btnMultiplayer.onclick = () => {
+    showScreen('lobby-screen');
+    initLobby();
+  };
+  menuButtons.appendChild(btnMultiplayer);
+
   const btnEditor = document.createElement('button');
   btnEditor.className = 'pixel-btn';
   btnEditor.textContent = '地图编辑器';
@@ -341,6 +359,61 @@ function initEditor() {
   };
 }
 
+function initLobby() {
+  if (!network) {
+    network = new NetworkClient(SERVER_URL);
+    network.connect();
+  }
+  if (!lobby) {
+    lobby = new Lobby(network, (isHost, role) => {
+      startMultiplayerGame(isHost, role);
+    });
+  }
+  lobby.render(
+    document.getElementById('lobby-content'),
+    document.getElementById('lobby-status')
+  );
+}
+
+function startMultiplayerGame(isHost, role) {
+  isMultiplayerGame = true;
+
+  const mapData = (mapTypeSelection === MAP_TYPE.CUSTOM && customMapData) ? customMapData : null;
+
+  if (isHost) {
+    if (mapTypeSelection === MAP_TYPE.CUSTOM && customMapData) {
+      game.init(mapTypeSelection, gameModeSelection, customMapData);
+    } else {
+      game.init(mapTypeSelection, gameModeSelection);
+    }
+    game.initMultiplayer(mapTypeSelection, gameModeSelection, mapData, role || PLAYER_ROLE.SURVIVOR, true, network);
+    // Send game start with map data to client
+    const mapJson = game.map.toJSON();
+    network.send('game_event', { event: 'game_start', mapType: mapTypeSelection, mode: gameModeSelection, mapData: mapJson, hostRole: role });
+    showScreen('game-screen');
+    lastTime = 0;
+    accumulator = 0;
+    resultShown = false;
+  } else {
+    // Client waits for game_start from host
+    network.on('game_event', function onGameStart(msg) {
+      if (msg.event === 'game_start') {
+        network.off('game_event', onGameStart);
+        const mData = msg.mapData ? JSON.parse(msg.mapData) : null;
+        const mType = msg.mapType || MAP_TYPE.HYBRID;
+        const mode = msg.mode || GAME_MODE.ESCAPE;
+        const clientRole = msg.hostRole === PLAYER_ROLE.SURVIVOR ? PLAYER_ROLE.KILLER : PLAYER_ROLE.SURVIVOR;
+        game.init(mType, mode, mData);
+        game.initMultiplayer(mType, mode, mData, clientRole, false, network);
+        showScreen('game-screen');
+        lastTime = 0;
+        accumulator = 0;
+        resultShown = false;
+      }
+    });
+  }
+}
+
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
@@ -374,6 +447,13 @@ function showResult() {
 }
 
 document.getElementById('btn-restart').onclick = () => {
+  if (isMultiplayerGame) {
+    // Disconnect and go back to lobby
+    game = new Game();
+    showScreen('lobby-screen');
+    initLobby();
+    return;
+  }
   if (mapTypeSelection === MAP_TYPE.CUSTOM && customMapData) {
     game.init(mapTypeSelection, gameModeSelection, customMapData);
   } else {
@@ -385,6 +465,11 @@ document.getElementById('btn-restart').onclick = () => {
 };
 
 document.getElementById('btn-menu').onclick = () => {
+  if (isMultiplayerGame) {
+    network.disconnect();
+    isMultiplayerGame = false;
+    game = new Game();
+  }
   showScreen('menu-screen');
   buildMenu();
 };
@@ -419,6 +504,8 @@ function gameLoop(timestamp) {
   lastTime = timestamp;
 
   if (game.state === STATE.PLAYING) {
+    // Host or single-player: full simulation with fixed timestep
+    // Client: game.update() handles input prediction + sending
     accumulator += elapsed;
     while (accumulator >= FIXED_DT) {
       game.update(FIXED_DT / 1000);

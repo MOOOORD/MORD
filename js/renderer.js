@@ -18,8 +18,10 @@ export class Renderer {
   _renderGame(game) {
     const { player, killer, map, objectives, pulseFrame } = game;
 
-    const camX = player.x - CANVAS_WIDTH / 2;
-    const camY = player.y - CANVAS_HEIGHT / 2;
+    // Focal entity for camera: killer sees from killer's perspective
+    const focal = (game.isMultiplayer && game.localRole === 'killer') ? killer : player;
+    const camX = focal.x - CANVAS_WIDTH / 2;
+    const camY = focal.y - CANVAS_HEIGHT / 2;
     const maxCamX = map.cols * 32 - CANVAS_WIDTH;
     const maxCamY = map.rows * 32 - CANVAS_HEIGHT;
     const cx = Math.max(0, Math.min(camX, maxCamX));
@@ -37,7 +39,6 @@ export class Renderer {
         this._drawPixelChar(ctx, psx - 12, psy - 12, sprite, 3);
       }
     } else if (player.health === 'hooked') {
-      // Hooked player visual
       ctx.fillStyle = '#ff6b6b';
       ctx.fillRect(psx - 4, psy - 16, 8, 8);
       ctx.fillStyle = '#e94560';
@@ -52,10 +53,19 @@ export class Renderer {
       this._drawPixelChar(ctx, ksx - 9, ksy - 9, kSprite, 3);
     }
 
-    this._renderVisionMask(game, cx, cy);
-    this._renderHeartbeat(player, killer);
+    // Survivor-only effects
+    if (!game.isMultiplayer || game.localRole === 'survivor') {
+      this._renderVisionMask(game, cx, cy);
+      this._renderHeartbeat(player, killer);
+    }
+
     this._renderPowerFlash(game);
     this._renderHUD(game);
+
+    // Multiplayer status
+    if (game.isMultiplayer) {
+      this._renderNetworkStatus(game);
+    }
 
     if (game.mode === GAME_MODE.SCORE) {
       this._renderScoreTimer(game);
@@ -210,6 +220,21 @@ export class Renderer {
     ctx.fillText(`${mins}:${String(secs).padStart(2, '0')}`,
                  CANVAS_WIDTH / 2, 44);
     ctx.textAlign = 'start';
+  }
+
+  _renderNetworkStatus(game) {
+    const nc = game.network;
+    const status = nc ? nc.connectionState : 'disconnected';
+    const colors = { connected: '#4ecca3', connecting: '#f0c040', disconnected: '#e94560' };
+    const labels = { connected: '● 已连接', connecting: '◐ 连接中', disconnected: '○ 已断开' };
+    ctx.font = '12px monospace';
+    ctx.fillStyle = colors[status] || '#888';
+    ctx.fillText(labels[status] || status, CANVAS_WIDTH - 130, CANVAS_HEIGHT - 12);
+
+    // Role label
+    const roleLabel = game.localRole === 'survivor' ? '陈飞飞 (逃生者)' : '阴沟 (监管者)';
+    ctx.fillStyle = game.localRole === 'survivor' ? '#4ecdc4' : '#e94560';
+    ctx.fillText(roleLabel, 16, CANVAS_HEIGHT - 12);
   }
 
   _renderPauseOverlay() {

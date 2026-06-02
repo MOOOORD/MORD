@@ -425,3 +425,135 @@ body { background: #0a0a0a; color: #e0e0e0; font-family: 'Press Start 2P', monos
   min-height: 30px;
   margin-top: 6px;
 }
+
+/* --- Lobby Screen --- */
+.lobby-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.lobby-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 34px;
+  color: #e94560;
+  text-shadow: 0 0 10px rgba(233,69,96,0.4);
+  letter-spacing: 4px;
+  margin-bottom: 8px;
+}
+
+#lobby-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-width: 420px;
+}
+
+.lobby-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.room-code-display {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 52px;
+  color: #4ecdc4;
+  text-shadow: 0 0 20px rgba(78,205,196,0.5);
+  letter-spacing: 12px;
+  padding: 16px 32px;
+  border: 3px solid #4ecdc4;
+  background: #111;
+}
+
+.room-code-input {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.code-digit {
+  width: 56px;
+  height: 72px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 32px;
+  text-align: center;
+  color: #4ecdc4;
+  background: #111;
+  border: 3px solid #333;
+  outline: none;
+  caret-color: #4ecdc4;
+}
+.code-digit:focus {
+  border-color: #4ecdc4;
+  box-shadow: 0 0 8px rgba(78,205,196,0.3);
+}
+
+.role-cards {
+  display: flex;
+  gap: 24px;
+  margin: 16px 0;
+}
+
+.role-card {
+  width: 200px;
+  padding: 20px 16px;
+  border: 3px solid #333;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  background: #1a1a2e;
+}
+.role-card:hover {
+  background: #2a2a3e;
+}
+.role-card.selected-survivor {
+  border-color: #4ecdc4;
+  box-shadow: 0 0 16px rgba(78,205,196,0.3);
+}
+.role-card.selected-killer {
+  border-color: #e94560;
+  box-shadow: 0 0 16px rgba(233,69,96,0.3);
+}
+
+.role-card .role-icon {
+  font-size: 40px;
+  margin-bottom: 8px;
+}
+.role-card .role-name {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.role-card.survivor .role-name { color: #4ecdc4; }
+.role-card.killer .role-name { color: #e94560; }
+.role-card .role-hint {
+  font-size: 11px;
+  color: #666;
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+#lobby-status {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  color: #888;
+  text-align: center;
+  min-height: 20px;
+}
+#lobby-status.error { color: #e94560; }
+#lobby-status.connecting { color: #f0c040; }
+#lobby-status.connected { color: #4ecca3; }
+
+.waiting-dots::after {
+  content: '';
+  animation: waitingDots 1.5s steps(4) infinite;
+}
+@keyframes waitingDots {
+  0% { content: '.'; }
+  25% { content: '..'; }
+  50% { content: '...'; }
+  75% { content: ''; }
+}

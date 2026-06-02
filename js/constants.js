@@ -97,3 +97,22 @@ export const PLAYER_HEALTH = {
   HOOKED: 'hooked',
   DEAD: 'dead',
 };
+
+// Network sync
+export const NETWORK_STATE_RATE = 50;    // ms between state syncs (20 Hz)
+export const NETWORK_INPUT_RATE = 33;    // ms between input sends (~30 Hz)
+
+export const PLAYER_ROLE = {
+  SURVIVOR: 'survivor',
+  KILLER: 'killer',
+  SPECTATOR: 'spectator',
+};
+
+// Multiplayer game state (extends STATE for lobby)
+export const LOBBY_STATE = {
+  IDLE: 'idle',
+  CREATING: 'creating',
+  JOINING: 'joining',
+  WAITING: 'waiting',
+  READY: 'ready',
+};
