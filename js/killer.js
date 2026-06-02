@@ -68,9 +68,9 @@ export class Killer {
     this._updateState(player, gameMap);
     this._executeState(dt, player, gameMap);
 
-    // Stuck detection — if killer hasn't moved significantly, try alternate route
+    // Stuck detection — if killer hasn't moved at all, try alternate route
     const moved = Math.hypot(this.x - this.lastPos.x, this.y - this.lastPos.y);
-    if (moved < 8) {
+    if (moved < 0.5) {
       this.stuckFrames++;
       if (this.stuckFrames > 90) {
         this._tryUnstuck(gameMap);
@@ -197,7 +197,7 @@ export class Killer {
 
     // Stuck detection
     const moved = Math.hypot(this.x - this.lastPos.x, this.y - this.lastPos.y);
-    if (moved < 8) {
+    if (moved < 0.5) {
       this.stuckFrames++;
       if (this.stuckFrames > 90) {
         this._tryUnstuck(gameMap);
