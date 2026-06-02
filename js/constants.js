@@ -59,6 +59,8 @@ export const KILLER_ALERT_DURATION = 180; // frames
 export const KILLER_CHASE_RANGE = 14;  // tiles — lose chase beyond this distance
 
 export const PLAYER_VISION_RADIUS = 200; // pixels around player that are visible
+export const KILLER_VISION_RADIUS = 100; // multiplayer killer vision (half of survivor)
+export const FOOTPRINT_DURATION = 300;  // frames (5 seconds at 60fps)
 export const SCORE_MODE_TIME = 300;    // seconds (5 minutes)
 
 export const STATE = {

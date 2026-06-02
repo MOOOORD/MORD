@@ -1,5 +1,5 @@
 // game.js
-import { STATE, GAME_MODE, PLAYER_HEALTH, SCORE_MODE_TIME, KILLER_SPEED, KILLER_STATE, NETWORK_STATE_RATE, NETWORK_INPUT_RATE, PLAYER_ROLE } from './constants.js';
+import { STATE, GAME_MODE, PLAYER_HEALTH, SCORE_MODE_TIME, KILLER_SPEED, KILLER_STATE, NETWORK_STATE_RATE, NETWORK_INPUT_RATE, PLAYER_ROLE, FOOTPRINT_DURATION } from './constants.js';
 import { GameMap } from './map.js';
 import { Player } from './player.js';
 import { Killer } from './killer.js';
@@ -32,6 +32,7 @@ export class Game {
     this.pulseFrame = 0;
     this.gatesJustPowered = false;
     this.powerFlash = 0;
+    this.footprints = [];
     // Multiplayer
     this.isMultiplayer = false;
     this.localRole = null;
@@ -56,6 +57,8 @@ export class Game {
     this.resultType = '';
     this.gatesJustPowered = false;
     this.powerFlash = 0;
+    this.footprints = [];
+    this._footprintTimer = 0;
     this.state = STATE.PLAYING;
   }
 
@@ -105,6 +108,7 @@ export class Game {
       d: this.map.exitGates.map(g => [g.x, g.y, g.open ? 1 : 0, g.powered ? 1 : 0]),
       l: this.map.pallets.map(p => [p.x, p.y, p.dropped ? 1 : 0, p.broken ? 1 : 0]),
       w: Object.fromEntries(this.objectives.windowCooldowns),
+      fp: this.footprints.slice(-60).map(f => [f.x, f.y, f.time]),
       m: [this.mode === GAME_MODE.ESCAPE ? 0 : 1, this.score, this.scoreTimer,
         this.gensRepaired, this.powerFlash, this.survivalTime],
       seq: ++this.lastInputSeq,
@@ -183,6 +187,11 @@ export class Game {
       for (const [k, v] of Object.entries(s.w)) {
         this.objectives.windowCooldowns.set(k, v);
       }
+    }
+
+    // Footprints
+    if (s.fp) {
+      this.footprints = s.fp.map(([x, y, t]) => ({ x, y, time: t }));
     }
 
     // Game state
@@ -328,6 +337,17 @@ export class Game {
         }
       }
     }
+
+    // Footprint tracking — survivor leaves trail visible to killer
+    if (this.player.health !== 'dead' && this.player.health !== 'hooked') {
+      this._footprintTimer = (this._footprintTimer || 0) + 1;
+      if (this._footprintTimer >= 5) {
+        this._footprintTimer = 0;
+        this.footprints.push({ x: this.player.x, y: this.player.y, time: FOOTPRINT_DURATION });
+      }
+    }
+    // Expire old footprints
+    this.footprints = this.footprints.filter(f => { f.time -= 1; return f.time > 0; });
 
     this._checkEndConditions();
 

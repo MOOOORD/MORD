@@ -1,5 +1,5 @@
 // renderer.js
-import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_HEALTH, GAME_MODE, STATE, PLAYER_VISION_RADIUS, REPAIR_TIME } from './constants.js';
+import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_HEALTH, GAME_MODE, STATE, PLAYER_VISION_RADIUS, KILLER_VISION_RADIUS, REPAIR_TIME } from './constants.js';
 import { canvas, ctx } from './main.js';
 
 export class Renderer {
@@ -53,9 +53,12 @@ export class Renderer {
       this._drawPixelChar(ctx, ksx - 9, ksy - 9, kSprite, 3);
     }
 
-    // Survivor-only effects
-    if (!game.isMultiplayer || game.localRole === 'survivor') {
-      this._renderVisionMask(game, cx, cy);
+    // Vision mask + effects
+    if (game.isMultiplayer && game.localRole === 'killer') {
+      this._renderVisionMask(game, cx, cy, KILLER_VISION_RADIUS);
+      this._renderFootprints(game, cx, cy);
+    } else {
+      this._renderVisionMask(game, cx, cy, PLAYER_VISION_RADIUS);
       this._renderHeartbeat(player, killer);
     }
 
@@ -72,11 +75,11 @@ export class Renderer {
     }
   }
 
-  _renderVisionMask(game, camX, camY) {
-    const { player } = game;
-    const px = player.x - camX;
-    const py = player.y - camY;
-    const R = PLAYER_VISION_RADIUS;
+  _renderVisionMask(game, camX, camY, radius) {
+    const focal = (game.isMultiplayer && game.localRole === 'killer') ? game.killer : game.player;
+    const px = focal.x - camX;
+    const py = focal.y - camY;
+    const R = radius;
 
     // Solid dark overlay with circular vision hole (evenodd fill rule)
     ctx.save();
@@ -122,6 +125,21 @@ export class Renderer {
     ctx.font = '26px monospace';
     ctx.fillStyle = '#e94560';
     ctx.fillText(beats, CANVAS_WIDTH - 70, 34);
+  }
+
+  _renderFootprints(game, camX, camY) {
+    for (const fp of game.footprints) {
+      const alpha = fp.time / 300; // fade from 1→0 over duration
+      const sx = fp.x - camX;
+      const sy = fp.y - camY;
+      // Only draw if on screen
+      if (sx < -16 || sx > CANVAS_WIDTH + 16 || sy < -16 || sy > CANVAS_HEIGHT + 16) continue;
+      ctx.fillStyle = `rgba(255, 120, 60, ${alpha * 0.7})`;
+      ctx.fillRect(sx - 2, sy - 2, 4, 4);
+      // Soft glow
+      ctx.fillStyle = `rgba(255, 160, 100, ${alpha * 0.25})`;
+      ctx.fillRect(sx - 4, sy - 4, 8, 8);
+    }
   }
 
   _renderPowerFlash(game) {
