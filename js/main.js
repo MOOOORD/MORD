@@ -51,6 +51,8 @@ function startQuoteRotation() {
     }, 500);
   };
   pick();
+  bar.style.cursor = 'pointer';
+  bar.onclick = pick;
   if (quoteInterval) clearInterval(quoteInterval);
   quoteInterval = setInterval(pick, 10000);
 }
