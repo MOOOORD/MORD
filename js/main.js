@@ -138,75 +138,93 @@ function drawCatAvatar() {
   const c = document.getElementById('cat-avatar');
   if (!c) return;
   const ctx = c.getContext('2d');
-  const s = 4; // 14x14 sprite at 4x scale = 56x56
+  const s = 4;
   ctx.fillStyle = '#1a1a2e';
   ctx.fillRect(0, 0, 56, 56);
 
-  // Cat ears (top)
-  ctx.fillStyle = '#ffccaa';
-  ctx.fillRect(2*s, 0, 2*s, 2*s);      // left ear inner
-  ctx.fillRect(10*s, 0, 2*s, 2*s);     // right ear inner
-  ctx.fillStyle = '#e8a080';
-  ctx.fillRect(3*s, 1*s, 1*s, 1*s);    // left ear shadow
-  ctx.fillRect(10*s, 1*s, 1*s, 1*s);   // right ear shadow
-  // Ear triangles
-  ctx.fillStyle = '#333';
-  ctx.fillRect(1*s, 1*s, 1*s, 1*s);
-  ctx.fillRect(12*s, 1*s, 1*s, 1*s);
+  // Long hair — dark purple cascading sides
+  ctx.fillStyle = '#3a2540';
+  // Left hair flow
+  ctx.fillRect(0, 3*s, 1*s, 8*s);
+  ctx.fillRect(1*s, 2*s, 1*s, 10*s);
+  ctx.fillRect(0, 10*s, 2*s, 3*s);
+  ctx.fillRect(0, 13*s, 1*s, 1*s);
+  // Right hair flow
+  ctx.fillRect(13*s, 3*s, 1*s, 8*s);
+  ctx.fillRect(12*s, 2*s, 1*s, 10*s);
+  ctx.fillRect(12*s, 10*s, 2*s, 3*s);
+  ctx.fillRect(13*s, 13*s, 1*s, 1*s);
 
-  // Hair
-  ctx.fillStyle = '#4a3040';
-  ctx.fillRect(1*s, 2*s, 12*s, 1*s);
-  ctx.fillRect(0, 3*s, 14*s, 1*s);
+  // Bangs
+  ctx.fillStyle = '#3a2540';
+  ctx.fillRect(2*s, 2*s, 10*s, 2*s);
+  ctx.fillRect(1*s, 3*s, 2*s, 1*s);
+  ctx.fillRect(11*s, 3*s, 2*s, 1*s);
 
-  // Face
-  ctx.fillStyle = '#ffccaa';
-  ctx.fillRect(2*s, 4*s, 10*s, 5*s);
+  // Cat ears poking through hair
+  ctx.fillStyle = '#3a2540';
+  ctx.fillRect(2*s, 0, 2*s, 2*s);       // left ear outer
+  ctx.fillRect(10*s, 0, 2*s, 2*s);      // right ear outer
+  ctx.fillStyle = '#ffbbaa';
+  ctx.fillRect(3*s, 1*s, 1*s, 1*s);     // left ear inner
+  ctx.fillRect(10*s, 1*s, 1*s, 1*s);    // right ear inner
 
-  // Eyes (big cute)
+  // Face — softer rounded shape (11x8 → shaped)
+  ctx.fillStyle = '#ffccbb';
+  // Core face
+  ctx.fillRect(2*s, 4*s, 10*s, 6*s);
+  // Round cheeks: widen middle
+  ctx.fillRect(1*s, 5*s, 1*s, 2*s);
+  ctx.fillRect(12*s, 5*s, 1*s, 2*s);
+  // Tapered chin
+  ctx.fillRect(3*s, 10*s, 8*s, 1*s);
+  ctx.fillRect(4*s, 11*s, 6*s, 1*s);
+  // Jaw curve — trim corners
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(2*s, 11*s, 2*s, 1*s);
+  ctx.fillRect(10*s, 11*s, 2*s, 1*s);
+  ctx.fillRect(1*s, 10*s, 1*s, 2*s);
+  ctx.fillRect(12*s, 10*s, 1*s, 2*s);
+
+  // Restore skin at chin
+  ctx.fillStyle = '#ffccbb';
+  ctx.fillRect(4*s, 11*s, 6*s, 1*s);
+
+  // Eyes — large cute
   ctx.fillStyle = '#fff';
-  ctx.fillRect(3*s, 5*s, 3*s, 3*s);    // left eye white
-  ctx.fillRect(8*s, 5*s, 3*s, 3*s);    // right eye white
-  ctx.fillStyle = '#4a90d9';
-  ctx.fillRect(4*s, 6*s, 2*s, 2*s);    // left iris
-  ctx.fillRect(9*s, 6*s, 2*s, 2*s);    // right iris
+  ctx.fillRect(3*s, 5*s, 3*s, 2*s);     // left eye
+  ctx.fillRect(8*s, 5*s, 3*s, 2*s);     // right eye
+  ctx.fillStyle = '#5a4080';
+  ctx.fillRect(4*s, 5*s, 2*s, 2*s);     // left iris
+  ctx.fillRect(9*s, 5*s, 2*s, 2*s);     // right iris
   ctx.fillStyle = '#111';
-  ctx.fillRect(5*s, 6*s, 1*s, 1*s);    // left pupil
-  ctx.fillRect(10*s, 6*s, 1*s, 1*s);   // right pupil
+  ctx.fillRect(5*s, 5*s, 1*s, 1*s);     // left pupil
+  ctx.fillRect(10*s, 5*s, 1*s, 1*s);    // right pupil
   // Eye shine
   ctx.fillStyle = '#fff';
-  ctx.fillRect(5*s, 5*s, 1*s, 1*s);
-  ctx.fillRect(10*s, 5*s, 1*s, 1*s);
+  ctx.fillRect(5*s, 6*s, 1*s, 1*s);
+  ctx.fillRect(10*s, 6*s, 1*s, 1*s);
 
-  // Blush
-  ctx.fillStyle = 'rgba(255, 150, 150, 0.5)';
+  // Eyelashes
+  ctx.fillStyle = '#3a2540';
+  ctx.fillRect(2*s, 4*s, 4*s, 1*s);
+  ctx.fillRect(8*s, 4*s, 4*s, 1*s);
+
+  // Soft blush
+  ctx.fillStyle = 'rgba(255, 140, 150, 0.45)';
   ctx.fillRect(2*s, 7*s, 2*s, 1*s);
   ctx.fillRect(10*s, 7*s, 2*s, 1*s);
 
-  // Mouth (tiny cat mouth)
-  ctx.fillStyle = '#cc6655';
+  // Tiny cute mouth
+  ctx.fillStyle = '#cc7766';
   ctx.fillRect(6*s, 8*s, 2*s, 1*s);
-  ctx.fillRect(5*s, 8*s, 1*s, 1*s);
 
-  // Chin
-  ctx.fillStyle = '#ffccaa';
-  ctx.fillRect(4*s, 9*s, 6*s, 1*s);
-
-  // Body / collar
-  ctx.fillStyle = '#e94560';
-  ctx.fillRect(3*s, 10*s, 8*s, 1*s);
-  // Bell
-  ctx.fillStyle = '#f0c040';
-  ctx.fillRect(6*s, 10*s, 2*s, 1*s);
-
-  // Body
-  ctx.fillStyle = '#4a3040';
-  ctx.fillRect(3*s, 11*s, 8*s, 3*s);
-
-  // Paws
-  ctx.fillStyle = '#ffccaa';
-  ctx.fillRect(3*s, 13*s, 2*s, 1*s);
-  ctx.fillRect(9*s, 13*s, 2*s, 1*s);
+  // Hair strands over shoulders in front
+  ctx.fillStyle = '#3a2540';
+  ctx.fillRect(1*s, 9*s, 2*s, 4*s);
+  ctx.fillRect(11*s, 9*s, 2*s, 4*s);
+  ctx.fillRect(2*s, 12*s, 2*s, 1*s);
+  ctx.fillRect(10*s, 12*s, 2*s, 1*s);
 }
 
 function setupCatTooltip() {
