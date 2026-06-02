@@ -186,18 +186,19 @@ export class Killer {
           this.state = KILLER_STATE.CARRY;
           this.speed = KILLER_SPEED * 0.95;
           this._findNearestHook(gameMap);
-        }
-        // Break nearby pallet
-        const tileCol = Math.floor(this.x / TILE_SIZE);
-        const tileRow = Math.floor(this.y / TILE_SIZE);
-        const pallet = gameMap.pallets.find(p =>
-          p.x === tileCol && p.y === tileRow && p.dropped && !p.broken
-        );
-        if (pallet) {
-          this.preBreakState = this.state;
-          this.state = KILLER_STATE.BREAK;
-          this.breakTimer = KILLER_BREAK_TIME;
-          this.breakTarget = pallet;
+        } else {
+          // Break nearby pallet (only if not picking up)
+          const tileCol = Math.floor(this.x / TILE_SIZE);
+          const tileRow = Math.floor(this.y / TILE_SIZE);
+          const pallet = gameMap.pallets.find(p =>
+            p.x === tileCol && p.y === tileRow && p.dropped && !p.broken
+          );
+          if (pallet) {
+            this.preBreakState = this.state;
+            this.state = KILLER_STATE.BREAK;
+            this.breakTimer = KILLER_BREAK_TIME;
+            this.breakTarget = pallet;
+          }
         }
       }
     }
