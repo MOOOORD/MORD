@@ -1,5 +1,5 @@
 // renderer.js
-import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_HEALTH, GAME_MODE, STATE, PLAYER_VISION_RADIUS, KILLER_VISION_RADIUS, REPAIR_TIME, PLAYER_ROLE, FOOTPRINT_DURATION } from './constants.js';
+import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_HEALTH, GAME_MODE, STATE, PLAYER_VISION_RADIUS, KILLER_VISION_RADIUS, REPAIR_TIME, PLAYER_ROLE, FOOTPRINT_DURATION, TILE_SIZE, TILE } from './constants.js';
 import { canvas, ctx } from './main.js';
 
 export class Renderer {
@@ -33,7 +33,10 @@ export class Renderer {
     // Player pixel sprite
     const psx = player.x - cx;
     const psy = player.y - cy;
-    const killerBlind = game.isMultiplayer && game.localRole === 'killer' && Math.hypot(player.x - killer.x, player.y - killer.y) > KILLER_VISION_RADIUS;
+    const killerBlind = game.isMultiplayer && game.localRole === 'killer' && (
+      Math.hypot(player.x - killer.x, player.y - killer.y) > KILLER_VISION_RADIUS ||
+      !this._hasLineOfSight(game.map, killer.x, killer.y, player.x, player.y)
+    );
     if (!killerBlind) {
       if (player.health !== 'dead' && player.health !== 'hooked') {
         if (!(player.invincibleTimer > 0 && Math.floor(player.invincibleTimer / 4) % 2 === 0)) {
@@ -58,7 +61,7 @@ export class Renderer {
 
     // Vision mask + effects
     if (game.isMultiplayer && game.localRole === 'killer') {
-      this._renderVisionMask(game, cx, cy, KILLER_VISION_RADIUS);
+      this._renderKillerVisionMask(game, cx, cy, KILLER_VISION_RADIUS);
       this._renderFootprints(game, killer, cx, cy);
     } else {
       this._renderVisionMask(game, cx, cy, PLAYER_VISION_RADIUS);
@@ -105,6 +108,83 @@ export class Renderer {
     ctx.restore();
   }
 
+  _hasLineOfSight(map, x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const steps = Math.ceil(dist / (TILE_SIZE / 2));
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const tile = map.getTile(x1 + dx * t, y1 + dy * t);
+      if (tile === TILE.WALL || tile === TILE.OBSTACLE) return false;
+    }
+    return true;
+  }
+
+  _renderKillerVisionMask(game, camX, camY, radius) {
+    const killer = game.killer;
+    const px = killer.x - camX;
+    const py = killer.y - camY;
+    const map = game.map;
+    const stepSize = TILE_SIZE / 2;
+    const maxSteps = Math.ceil(radius / stepSize);
+
+    // Cast rays to build visibility polygon (walls/obstacles block, pallets/windows don't)
+    const points = [];
+    const numRays = 240;
+    for (let i = 0; i < numRays; i++) {
+      const angle = (i / numRays) * Math.PI * 2;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      let endDist = radius;
+
+      for (let step = 1; step <= maxSteps; step++) {
+        const dist = step * stepSize;
+        if (dist >= radius) break;
+        const wx = killer.x + cos * dist;
+        const wy = killer.y + sin * dist;
+        const tile = map.getTile(wx, wy);
+        if (tile === TILE.WALL || tile === TILE.OBSTACLE) {
+          endDist = dist - stepSize / 2;
+          break;
+        }
+      }
+
+      points.push({
+        x: killer.x + cos * endDist - camX,
+        y: killer.y + sin * endDist - camY,
+      });
+    }
+
+    // Solid dark overlay with visibility polygon hole
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.88)';
+    ctx.fill('evenodd');
+    ctx.restore();
+
+    // Soft fade at the vision edge (clipped to visibility polygon)
+    ctx.save();
+    const fade = ctx.createRadialGradient(px, py, radius - 40, px, py, radius);
+    fade.addColorStop(0, 'rgba(0,0,0,0)');
+    fade.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = fade;
+    ctx.fill();
+    ctx.restore();
+  }
+
   _renderHeartbeat(player, killer) {
     const level = killer.getHeartbeatLevel(player);
     if (level === 0) return;
@@ -133,6 +213,7 @@ export class Renderer {
   _renderFootprints(game, killer, camX, camY) {
     for (const fp of game.footprints) {
       if (Math.hypot(fp.x - killer.x, fp.y - killer.y) > KILLER_VISION_RADIUS) continue;
+      if (!this._hasLineOfSight(game.map, killer.x, killer.y, fp.x, fp.y)) continue;
       const alpha = fp.time / FOOTPRINT_DURATION;
       const sx = fp.x - camX;
       const sy = fp.y - camY;

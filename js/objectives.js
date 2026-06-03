@@ -1,10 +1,11 @@
 // objectives.js
-import { TILE_SIZE, REPAIR_TIME, REPAIR_PHASES, GATE_OPEN_TIME, PALLET_STUN_TIME } from './constants.js';
+import { TILE_SIZE, REPAIR_TIME, REPAIR_PHASES, GATE_OPEN_TIME, PALLET_STUN_TIME, GEN_HIGHLIGHT_DURATION } from './constants.js';
 
 export class ObjectivesManager {
   constructor(gameMap) {
     this.map = gameMap;
     this.windowCooldowns = {};  // key: "col,row" → remaining frames
+    this.genHighlightTimers = {}; // key: "col,row" → remaining frames
   }
 
   update() {
@@ -12,6 +13,14 @@ export class ObjectivesManager {
       this.windowCooldowns[key]--;
       if (this.windowCooldowns[key] <= 0) delete this.windowCooldowns[key];
     }
+    for (const key in this.genHighlightTimers) {
+      this.genHighlightTimers[key]--;
+      if (this.genHighlightTimers[key] <= 0) delete this.genHighlightTimers[key];
+    }
+  }
+
+  setGenHighlight(x, y) {
+    this.genHighlightTimers[`${x},${y}`] = GEN_HIGHLIGHT_DURATION;
   }
 
   getNearbyInteractable(playerX, playerY, types = null) {
@@ -94,21 +103,17 @@ export class ObjectivesManager {
     const phaseSize = REPAIR_TIME / REPAIR_PHASES; // 300 frames per phase
     const currentPhase = Math.min(REPAIR_PHASES - 1, Math.floor(progress / phaseSize));
 
-    // Fire alert on each new phase reached (except final completion)
-    if (currentPhase > gen.phase && currentPhase < REPAIR_PHASES - 1) {
-      gen.phase = currentPhase;
-      return { done: false, event: 'phase_alert', phase: currentPhase + 1, phaseTotal: REPAIR_PHASES };
-    }
-
+    // Fire alert on each new phase milestone (1/3, 2/3)
     if (currentPhase > gen.phase) {
       gen.phase = currentPhase;
+      return { done: false, event: 'phase_alert', phase: currentPhase + 1, phaseTotal: REPAIR_PHASES, genX: gen.x, genY: gen.y };
     }
 
-    // Generator fully repaired
+    // Generator fully repaired — also fires as 3/3 milestone
     if (progress >= REPAIR_TIME) {
       gen.repaired = true;
       gen.phase = REPAIR_PHASES;
-      return { done: true, event: 'generator_repaired' };
+      return { done: true, event: 'generator_repaired', genX: gen.x, genY: gen.y };
     }
 
     // Spark chance increases with phase progress
@@ -189,6 +194,23 @@ export class ObjectivesManager {
       const sx = gen.x * TILE_SIZE - cameraX + TILE_SIZE / 2;
       const sy = gen.y * TILE_SIZE - cameraY + TILE_SIZE / 2;
       const phase = gen.phase || 0;
+
+      // Phase milestone highlight glow
+      const hlKey = `${gen.x},${gen.y}`;
+      const hlTimer = this.genHighlightTimers[hlKey];
+      if (hlTimer && hlTimer > 0) {
+        const hlAlpha = (hlTimer / GEN_HIGHLIGHT_DURATION) * 0.6;
+        const hlPulse = 1 + Math.sin(pulseFrame * 0.3) * 0.2;
+        const r = phase === 1 ? 240 : phase === 2 ? 240 : 240;
+        const g = phase === 1 ? 192 : phase === 2 ? 160 : 96;
+        const b = phase === 1 ? 64 : phase === 2 ? 48 : 48;
+        ctx.save();
+        ctx.shadowColor = `rgba(${r},${g},${b},${hlAlpha * hlPulse})`;
+        ctx.shadowBlur = 16 * hlPulse;
+        ctx.fillStyle = `rgba(${r},${g},${b},${hlAlpha})`;
+        ctx.fillRect(sx - 14, sy - 14, 28, 28);
+        ctx.restore();
+      }
 
       if (gen.repaired) {
         // Fully repaired — green

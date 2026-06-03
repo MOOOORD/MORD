@@ -86,6 +86,8 @@ export class Game {
           this.resultType = msg.resultType;
           this.resultTitle = msg.resultTitle;
           this.resultDetail = msg.resultDetail;
+        } else if (msg.event === 'gen_phase') {
+          this.objectives.setGenHighlight(msg.genX, msg.genY);
         }
       });
     }
@@ -265,7 +267,11 @@ export class Game {
             this.player.interacting = false;
             if (result.event === 'generator_repaired') {
               this.gensRepaired++;
+              this.objectives.setGenHighlight(result.genX, result.genY);
               if (this.mode === GAME_MODE.SCORE) this.score += 1000;
+              if (this.isMultiplayer && this.isHost) {
+                this._sendEvent('gen_phase', { genX: result.genX, genY: result.genY, phase: 3 });
+              }
               if (this.objectives.areGatesPowered()) {
                 this.gatesJustPowered = true;
                 this.powerFlash = 120;
@@ -274,6 +280,10 @@ export class Game {
           } else {
             if (result.event === 'phase_alert') {
               this._alertKillerToPlayer();
+              this.objectives.setGenHighlight(result.genX, result.genY);
+              if (this.isMultiplayer && this.isHost) {
+                this._sendEvent('gen_phase', { genX: result.genX, genY: result.genY, phase: result.phase });
+              }
             } else if (result.spark) {
               if (this.killer.state === 'patrol') {
                 this.killer.state = 'alert';
