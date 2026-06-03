@@ -1,5 +1,5 @@
 // renderer.js
-import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_HEALTH, GAME_MODE, STATE, PLAYER_VISION_RADIUS, KILLER_VISION_RADIUS, REPAIR_TIME, PLAYER_ROLE } from './constants.js';
+import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_HEALTH, GAME_MODE, STATE, PLAYER_VISION_RADIUS, KILLER_VISION_RADIUS, REPAIR_TIME, PLAYER_ROLE, FOOTPRINT_DURATION } from './constants.js';
 import { canvas, ctx } from './main.js';
 
 export class Renderer {
@@ -33,16 +33,19 @@ export class Renderer {
     // Player pixel sprite
     const psx = player.x - cx;
     const psy = player.y - cy;
-    if (player.health !== 'dead' && player.health !== 'hooked') {
-      if (!(player.invincibleTimer > 0 && Math.floor(player.invincibleTimer / 4) % 2 === 0)) {
-        const sprite = this._getPlayerSprite(player.health);
-        this._drawPixelChar(ctx, psx - 12, psy - 12, sprite, 3);
+    const killerBlind = game.isMultiplayer && game.localRole === 'killer' && Math.hypot(player.x - killer.x, player.y - killer.y) > KILLER_VISION_RADIUS;
+    if (!killerBlind) {
+      if (player.health !== 'dead' && player.health !== 'hooked') {
+        if (!(player.invincibleTimer > 0 && Math.floor(player.invincibleTimer / 4) % 2 === 0)) {
+          const sprite = this._getPlayerSprite(player.health);
+          this._drawPixelChar(ctx, psx - 12, psy - 12, sprite, 3);
+        }
+      } else if (player.health === 'hooked') {
+        ctx.fillStyle = '#ff6b6b';
+        ctx.fillRect(psx - 4, psy - 16, 8, 8);
+        ctx.fillStyle = '#e94560';
+        ctx.fillRect(psx - 6, psy - 18, 12, 4);
       }
-    } else if (player.health === 'hooked') {
-      ctx.fillStyle = '#ff6b6b';
-      ctx.fillRect(psx - 4, psy - 16, 8, 8);
-      ctx.fillStyle = '#e94560';
-      ctx.fillRect(psx - 6, psy - 18, 12, 4);
     }
 
     // Killer pixel sprite
@@ -56,7 +59,7 @@ export class Renderer {
     // Vision mask + effects
     if (game.isMultiplayer && game.localRole === 'killer') {
       this._renderVisionMask(game, cx, cy, KILLER_VISION_RADIUS);
-      this._renderFootprints(game, cx, cy);
+      this._renderFootprints(game, killer, cx, cy);
     } else {
       this._renderVisionMask(game, cx, cy, PLAYER_VISION_RADIUS);
       this._renderHeartbeat(player, killer);
@@ -127,16 +130,15 @@ export class Renderer {
     ctx.fillText(beats, CANVAS_WIDTH - 70, 34);
   }
 
-  _renderFootprints(game, camX, camY) {
+  _renderFootprints(game, killer, camX, camY) {
     for (const fp of game.footprints) {
-      const alpha = fp.time / 300; // fade from 1→0 over duration
+      if (Math.hypot(fp.x - killer.x, fp.y - killer.y) > KILLER_VISION_RADIUS) continue;
+      const alpha = fp.time / FOOTPRINT_DURATION;
       const sx = fp.x - camX;
       const sy = fp.y - camY;
-      // Only draw if on screen
       if (sx < -16 || sx > CANVAS_WIDTH + 16 || sy < -16 || sy > CANVAS_HEIGHT + 16) continue;
       ctx.fillStyle = `rgba(255, 120, 60, ${alpha * 0.7})`;
       ctx.fillRect(sx - 2, sy - 2, 4, 4);
-      // Soft glow
       ctx.fillStyle = `rgba(255, 160, 100, ${alpha * 0.25})`;
       ctx.fillRect(sx - 4, sy - 4, 8, 8);
     }
@@ -212,7 +214,7 @@ export class Renderer {
     const nearGen = game.objectives
       ? game.objectives.getNearbyInteractable(player.x, player.y, ['generator'])
       : null;
-    if (nearGen && (nearGen.obj.repairProgress || 0) > 0) {
+    if (nearGen && (nearGen.obj.repairProgress || 0) > 0 && !(game.isMultiplayer && game.localRole === PLAYER_ROLE.KILLER)) {
       const barW = 280, barH = 14;
       const bx = CANVAS_WIDTH / 2 - barW / 2;
       const by = CANVAS_HEIGHT - 32;

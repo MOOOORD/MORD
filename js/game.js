@@ -273,9 +273,7 @@ export class Game {
             }
           } else {
             if (result.event === 'phase_alert') {
-              if (!this.isMultiplayer || this.localRole !== PLAYER_ROLE.KILLER) {
-                this._alertKillerToPlayer();
-              }
+              this._alertKillerToPlayer();
             } else if (result.spark) {
               if (this.killer.state === 'patrol') {
                 this.killer.state = 'alert';

@@ -467,6 +467,10 @@ export class GameMap {
     const tile = this.grid[r][c];
     if (tile === TILE.WALL || tile === TILE.OBSTACLE) return false;
     if (tile === TILE.WINDOW && isPlayer) return false;
+    if (tile === TILE.PALLET) {
+      const pallet = this.pallets.find(p => p.x === c && p.y === r);
+      if (pallet && pallet.dropped && !pallet.broken && !isPlayer) return false;
+    }
     return true;
   }
 }
