@@ -140,8 +140,6 @@ export class Killer {
               this.state = KILLER_STATE.PATROL;
               this.speed = KILLER_SPEED;
               this.carryTarget = null;
-              this.attackPhase = 'idle';
-              this.attackTimer = 0;
               return;
             }
           }

@@ -1,5 +1,5 @@
 // renderer.js
-import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_HEALTH, GAME_MODE, STATE, PLAYER_VISION_RADIUS, KILLER_VISION_RADIUS, REPAIR_TIME, PLAYER_ROLE, FOOTPRINT_DURATION } from './constants.js';
+import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_HEALTH, GAME_MODE, STATE, PLAYER_VISION_RADIUS, KILLER_VISION_RADIUS, REPAIR_TIME, PLAYER_ROLE } from './constants.js';
 import { canvas, ctx } from './main.js';
 
 export class Renderer {
@@ -56,7 +56,7 @@ export class Renderer {
     // Vision mask + effects
     if (game.isMultiplayer && game.localRole === 'killer') {
       this._renderVisionMask(game, cx, cy, KILLER_VISION_RADIUS);
-      this._renderFootprints(game, killer, cx, cy);
+      this._renderFootprints(game, cx, cy);
     } else {
       this._renderVisionMask(game, cx, cy, PLAYER_VISION_RADIUS);
       this._renderHeartbeat(player, killer);
@@ -127,12 +127,9 @@ export class Renderer {
     ctx.fillText(beats, CANVAS_WIDTH - 70, 34);
   }
 
-  _renderFootprints(game, killer, camX, camY) {
+  _renderFootprints(game, camX, camY) {
     for (const fp of game.footprints) {
-      // Only show footprints within killer's vision range (world-space distance from killer)
-      const dist = Math.hypot(fp.x - killer.x, fp.y - killer.y);
-      if (dist > KILLER_VISION_RADIUS) continue;
-      const alpha = fp.time / FOOTPRINT_DURATION;
+      const alpha = fp.time / 300; // fade from 1→0 over duration
       const sx = fp.x - camX;
       const sy = fp.y - camY;
       // Only draw if on screen

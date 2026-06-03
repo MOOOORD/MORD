@@ -467,11 +467,6 @@ export class GameMap {
     const tile = this.grid[r][c];
     if (tile === TILE.WALL || tile === TILE.OBSTACLE) return false;
     if (tile === TILE.WINDOW && isPlayer) return false;
-    // Dropped pallets block movement (killer and player)
-    if (tile === TILE.PALLET) {
-      const pallet = this.pallets.find(p => p.x === c && p.y === r);
-      if (pallet && pallet.dropped && !pallet.broken) return false;
-    }
     return true;
   }
 }
