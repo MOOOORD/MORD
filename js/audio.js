@@ -24,6 +24,8 @@ class AudioManager {
 
   _apply() {
     if (this._bgm) this._bgm.volume = this._bgmVolume;
+    const chaseBgm = document.getElementById('bgm-chase');
+    if (chaseBgm) chaseBgm.volume = this._bgmVolume;
   }
 
   get bgmVolume() { return this._bgmVolume; }

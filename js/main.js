@@ -1,5 +1,5 @@
 // main.js
-import { CANVAS_WIDTH, CANVAS_HEIGHT, STATE, GAME_MODE, MAP_TYPE, PLAYER_ROLE } from './constants.js';
+import { CANVAS_WIDTH, CANVAS_HEIGHT, STATE, GAME_MODE, MAP_TYPE, PLAYER_ROLE, KILLER_STATE } from './constants.js';
 import { Game } from './game.js';
 import { Renderer } from './renderer.js';
 import { MapEditor } from './editor.js';
@@ -71,6 +71,8 @@ const gameScreen = document.getElementById('game-screen');
 const resultScreen = document.getElementById('result-screen');
 const menuButtons = document.getElementById('menu-buttons');
 const bgmMenu = document.getElementById('bgm-menu');
+const bgmChase = document.getElementById('bgm-chase');
+let chaseBgmPlaying = false;
 
 // --- Pixel Avatar Sprites (16x16, drawn at 5x = 80x80) ---
 const SURVIVOR_SPRITE = [
@@ -441,6 +443,12 @@ function showScreen(id) {
   } else {
     if (bgmMenu) bgmMenu.pause();
   }
+  // Stop chase BGM when leaving game screen
+  if (id !== 'game-screen' && bgmChase) {
+    bgmChase.pause();
+    bgmChase.currentTime = 0;
+    chaseBgmPlaying = false;
+  }
 }
 
 function showResult() {
@@ -535,6 +543,18 @@ function gameLoop(timestamp) {
     while (accumulator >= FIXED_DT) {
       game.update(FIXED_DT / 1000);
       accumulator -= FIXED_DT;
+    }
+
+    // Chase BGM: play when killer is chasing, pause when not
+    if (!game.isMultiplayer && bgmChase) {
+      const killerChasing = game.killer && game.killer.state === KILLER_STATE.CHASE;
+      if (killerChasing && !chaseBgmPlaying) {
+        bgmChase.play().catch(() => {});
+        chaseBgmPlaying = true;
+      } else if (!killerChasing && chaseBgmPlaying) {
+        bgmChase.pause();
+        chaseBgmPlaying = false;
+      }
     }
   }
 
