@@ -5,6 +5,7 @@ import { Renderer } from './renderer.js';
 import { MapEditor } from './editor.js';
 import { Lobby } from './lobby.js';
 import { DUN_BIRTH } from './maps.js';
+import { audio } from './audio.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -276,6 +277,15 @@ function buildMenu() {
   bottomLabel.style.cssText = 'font-size:12px;color:#888;margin:24px 0 8px';
   bottomLabel.textContent = '—— 其他 ——';
   menuButtons.appendChild(bottomLabel);
+
+  const btnSettings = document.createElement('button');
+  btnSettings.className = 'pixel-btn';
+  btnSettings.textContent = '系统设置';
+  btnSettings.onclick = () => {
+    showScreen('settings-screen');
+    syncSliders();
+  };
+  menuButtons.appendChild(btnSettings);
 
   const btnTutorial = document.createElement('button');
   btnTutorial.className = 'pixel-btn';
@@ -549,6 +559,36 @@ window._debug = function(msg) {
   const panel = document.getElementById('debug-panel');
   if (panel) panel.textContent = window._debugLines.join('\n');
 };
+
+// --- Settings Panel ---
+const sliderBgm = document.getElementById('slider-bgm');
+const sliderSfx = document.getElementById('slider-sfx');
+const valBgm = document.getElementById('val-bgm');
+const valSfx = document.getElementById('val-sfx');
+
+function syncSliders() {
+  sliderBgm.value = Math.round(audio.bgmVolume * 100);
+  sliderSfx.value = Math.round(audio.sfxVolume * 100);
+  valBgm.textContent = sliderBgm.value + '%';
+  valSfx.textContent = sliderSfx.value + '%';
+}
+
+sliderBgm.addEventListener('input', () => {
+  audio.setBgmVolume(sliderBgm.value / 100);
+  valBgm.textContent = sliderBgm.value + '%';
+});
+
+sliderSfx.addEventListener('input', () => {
+  audio.setSfxVolume(sliderSfx.value / 100);
+  valSfx.textContent = sliderSfx.value + '%';
+});
+
+document.getElementById('btn-settings-back').onclick = () => {
+  showScreen('menu-screen');
+  buildMenu();
+};
+
+syncSliders();
 
 showScreen('menu-screen');
 buildMenu();

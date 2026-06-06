@@ -557,3 +557,94 @@ body { background: #0a0a0a; color: #e0e0e0; font-family: 'Press Start 2P', monos
   50% { content: '...'; }
   75% { content: ''; }
 }
+
+/* --- Settings Screen --- */
+.settings-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  min-width: 420px;
+  padding: 40px 48px;
+  background: #111;
+  border: 3px solid #333;
+}
+
+.settings-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 28px;
+  color: #f0c040;
+  text-shadow: 0 0 10px rgba(240,192,64,0.3);
+  letter-spacing: 3px;
+  margin-bottom: 8px;
+}
+
+.settings-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  color: #ccc;
+  letter-spacing: 1px;
+}
+
+.settings-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.settings-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  background: #222;
+  border: 2px solid #555;
+  outline: none;
+  image-rendering: pixelated;
+}
+
+.settings-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  background: #e94560;
+  border: 2px solid #fff;
+  cursor: pointer;
+  image-rendering: pixelated;
+}
+
+.settings-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  background: #e94560;
+  border: 2px solid #fff;
+  cursor: pointer;
+}
+
+.settings-val {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  color: #4ecdc4;
+  min-width: 50px;
+  text-align: right;
+}
+
+#btn-settings-back {
+  margin-top: 8px;
+  border-color: #888;
+  background: #1a1a2e;
+  color: #aaa;
+}
+#btn-settings-back:hover {
+  background: #555;
+  color: #fff;
+  box-shadow: 0 0 15px rgba(136,136,136,0.4);
+}

@@ -125,6 +125,26 @@
     <button class="pixel-btn" id="btn-menu">返回主菜单</button>
   </div>
 </div>
+<div id="settings-screen" class="screen hidden">
+  <div class="settings-box">
+    <h2 class="settings-title">系统设置</h2>
+    <div class="settings-section">
+      <label class="settings-label">🎵 背景音乐</label>
+      <div class="settings-slider-row">
+        <input type="range" id="slider-bgm" min="0" max="100" value="70" class="settings-slider">
+        <span class="settings-val" id="val-bgm">70%</span>
+      </div>
+    </div>
+    <div class="settings-section">
+      <label class="settings-label">🔊 游戏音效</label>
+      <div class="settings-slider-row">
+        <input type="range" id="slider-sfx" min="0" max="100" value="100" class="settings-slider">
+        <span class="settings-val" id="val-sfx">100%</span>
+      </div>
+    </div>
+    <button class="pixel-btn" id="btn-settings-back">← 返回</button>
+  </div>
+</div>
 <script type="module" src="js/main.js"></script>
 <audio id="bgm-menu" src="assets/bgm_main_menu.mp3" loop preload="auto"></audio>
 </body>
