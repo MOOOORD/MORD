@@ -69,6 +69,7 @@ const menuScreen = document.getElementById('menu-screen');
 const gameScreen = document.getElementById('game-screen');
 const resultScreen = document.getElementById('result-screen');
 const menuButtons = document.getElementById('menu-buttons');
+const bgmMenu = document.getElementById('bgm-menu');
 
 // --- Pixel Avatar Sprites (16x16, drawn at 5x = 80x80) ---
 const SURVIVOR_SPRITE = [
@@ -424,7 +425,12 @@ function startMultiplayerGame(isHost, role) {
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
-  if (id === 'menu-screen') startQuoteRotation();
+  if (id === 'menu-screen') {
+    startQuoteRotation();
+    if (bgmMenu) bgmMenu.play().catch(() => {});
+  } else {
+    if (bgmMenu) bgmMenu.pause();
+  }
 }
 
 function showResult() {
@@ -549,6 +555,17 @@ buildMenu();
 drawAvatars();
 drawCatAvatar();
 setupCatTooltip();
+
+// Browser autoplay policy: start BGM on first user interaction
+if (bgmMenu) {
+  document.addEventListener('click', function bgmFirstTouch() {
+    if (bgmMenu.paused && document.getElementById('menu-screen').classList.contains('hidden') === false) {
+      bgmMenu.play().catch(() => {});
+    }
+    document.removeEventListener('click', bgmFirstTouch);
+  }, { once: true });
+}
+
 requestAnimationFrame(gameLoop);
 
 export { canvas, ctx };
