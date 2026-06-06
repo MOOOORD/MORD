@@ -590,6 +590,50 @@ document.getElementById('btn-settings-back').onclick = () => {
 
 syncSliders();
 
+// --- SFX system: global delegation for button sounds ---
+const sfxElements = {};
+['click', 'hover', 'confirm', 'back', 'start', 'denied'].forEach(name => {
+  sfxElements[name] = document.getElementById('sfx-' + name);
+});
+
+function playSfx(name) {
+  const el = sfxElements[name];
+  if (el) audio.playSfx(el);
+}
+
+// Global click → play appropriate sound based on button context
+document.addEventListener('click', (e) => {
+  if (!e.target || !e.target.closest) return;
+  const btn = e.target.closest('.pixel-btn');
+  if (!btn) {
+    // Check for role cards (lobby)
+    const card = e.target.closest('.role-card');
+    if (card) { playSfx('click'); return; }
+    // Check for editor palette buttons
+    const paletteBtn = e.target.closest('.editor-tile-btn');
+    if (paletteBtn) { playSfx('click'); return; }
+    return;
+  }
+
+  const text = btn.textContent.trim();
+  if (text.includes('返回') || text === '← 返回') {
+    playSfx('back');
+  } else if (text.includes('开始') || text.includes('再来')) {
+    playSfx('start');
+  } else if (text.includes('创建房间') || text.includes('加入房间')) {
+    playSfx('confirm');
+  } else {
+    playSfx('click');
+  }
+});
+
+// Global hover → subtle tick on pixel-btn and role-card
+document.addEventListener('mouseenter', (e) => {
+  if (!e.target || !e.target.closest) return;
+  const target = e.target.closest('.pixel-btn, .role-card, .editor-tile-btn');
+  if (target) playSfx('hover');
+}, { passive: true });
+
 showScreen('menu-screen');
 buildMenu();
 drawAvatars();
